@@ -62,7 +62,10 @@ function get_google_redirect_uri(): string {
 
     $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
     $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
-    $base = get_base_path();
+    $base = '';
+    if (str_contains($host, 'herbiecreative.com')) {
+        $base = '/cardobot';
+    }
     return $protocol . '://' . $host . $base . '/api/google-callback.php';
 }
 
