@@ -1,0 +1,485 @@
+/**
+ * Card-o-Bot Design System - CSS Variables
+ * Extracted from original cardobot CSS files
+ * Modernized for industry standards and responsiveness
+ */
+
+:root {
+  /* ============================================
+     COLOR PALETTE
+     ============================================ */
+  
+  /* Primary Colors */
+  --color-primary: rgb(224, 126, 140);        /* Pink - Main accent */
+  --color-primary-rgb: 224, 126, 140;
+  --color-primary-light: rgb(254, 161, 165);  /* Lighter pink */
+  --color-primary-lighter: rgb(254, 211, 215); /* Even lighter pink */
+  --color-primary-dark: rgb(180, 106, 120);   /* Darker pink */
+  --color-primary-darker: rgb(120, 80, 90);   /* Darkest pink */
+  
+  /* Secondary Colors */
+  --color-secondary: rgb(87, 189, 206);       /* Teal - Secondary accent */
+  --color-secondary-rgb: 87, 189, 206;
+  --color-secondary-light: rgb(94, 210, 240); /* Light teal */
+  --color-secondary-dark: rgb(44, 127, 162);   /* Dark teal */
+  --color-secondary-darker: rgb(44, 160, 190); /* Darker teal */
+  
+  /* Neutral Colors */
+  --color-dark: rgb(68, 71, 70);              /* Dark gray - Main dark */
+  --color-dark-rgb: 68, 71, 70;
+  --color-dark-light: rgb(90, 90, 90);        /* Medium gray */
+  --color-dark-lighter: rgb(100, 100, 100);   /* Lighter gray */
+  --color-dark-gray: rgb(128, 128, 128);      /* Console gray strip - #808080, rgba(128, 128, 128), HSL(0, 0%, 50%) */
+  --color-dark-dark: rgb(40, 40, 40);          /* Very dark */
+  --color-dark-darker: rgb(20, 20, 20);       /* Darkest */
+  --color-dark-darkest: rgb(10, 10, 10);      /* Almost black */
+  --color-border-gray: rgb(50, 50, 50);       /* Dark border for screens */
+  --color-shadow-gray: rgb(60, 60, 60);       /* Shadow gray */
+  --color-console-border: rgb(77, 77, 77);    /* Console border - #4d4d4d, rgba(77, 77, 77), HSL(0, 0%, 30%) */
+  
+  --color-light: rgb(245, 245, 245);          /* Light gray - Main light */
+  --color-light-rgb: 245, 245, 245;
+  --color-light-dark: rgb(220, 220, 220);     /* Slightly darker light */
+  --color-light-darker: rgb(203, 183, 155);    /* Beige/tan */
+  
+  /* Accent Colors */
+  --color-accent-beige: rgb(255, 229, 192);   /* Console yellow - #ffe5c0, rgba(255, 229, 192), HSL(35, 100%, 88%) */
+  --color-accent-beige-rgb: 255, 229, 192;
+  --color-accent-mint: rgb(149, 245, 227);    /* Mint green */
+  --color-accent-mint-rgb: 149, 245, 227;
+  --color-accent-mint-dark: rgb(99, 195, 177); /* Darker mint */
+  --color-accent-mint-light: rgb(118, 154, 146); /* Lighter mint */
+  
+  /* Console-Specific Colors */
+  --color-console-input-bg: rgba(80, 120, 120, 0.85);  /* Dark teal-gray input background */
+  --color-console-input-border: rgba(99, 195, 177, 0.75); /* Mint input border */
+  --color-console-shadow-teal: rgba(87, 199, 206, 0.1);  /* Teal drop shadow */
+  --color-console-shadow-teal-light: rgba(87, 199, 206, 0.07); /* Light teal shadow */
+  --color-console-shadow-cyan: rgba(150, 219, 226, 0.35); /* Cyan drop shadow */
+  --color-console-shadow-dark: rgba(60, 60, 60, 0.5);     /* Dark shadow */
+  
+  /* Text Colors - Console (Dark Background) */
+  --color-text-primary: rgb(179 236 250 / 90%);  /* Main text - light for dark backgrounds */
+  --color-text-secondary: rgb(201, 201, 201);  /* Secondary text - light for dark backgrounds */
+  --color-text-light: rgb(255, 238, 199);      /* Light text */
+  --color-text-dark: rgb(30, 30, 30);          /* Dark text */
+  --color-text-muted: rgba(100, 100, 100, 0.1); /* Muted text */
+  --color-console-title: rgb(196, 186, 173);   /* Console title text - #c4baad, rgba(196, 186, 173), HSL(34, 16%, 72%) */
+  
+  /* Text Colors - Admin (Light Background) */
+  --color-admin-text-primary: rgb(30, 30, 30);     /* Main text - dark for light backgrounds */
+  --color-admin-text-secondary: rgb(90, 90, 90);   /* Secondary text - dark for light backgrounds */
+  --color-admin-text-muted: rgba(100, 100, 100, 0.6); /* Muted text for admin */
+  
+  /* Background Colors */
+  --color-bg-primary: rgb(245, 245, 245);      /* Main background */
+  --color-bg-secondary: rgba(68, 71, 70, 0.90); /* Dark overlay */
+  --color-bg-tertiary: rgba(68, 71, 70, 0.75);  /* Medium dark overlay */
+  --color-bg-dark: rgba(68, 71, 70, 0.65);     /* Dark background */
+  --color-bg-light: rgba(255, 255, 255, 1);    /* White background */
+  --color-bg-overlay: rgba(68, 71, 70, 0.5);   /* Semi-transparent overlay */
+  
+  /* Status Colors */
+  --color-success: rgb(99, 195, 177);         /* Success/mint */
+  --color-error: rgb(222, 82, 84);             /* Error/red */
+  --color-error-rgb: 222, 82, 84;
+  --color-error-light: rgb(252, 172, 180);     /* Light error */
+  --color-error-dark: rgb(180, 50, 52);        /* Dark error */
+  --color-warning: rgb(255, 229, 192);         /* Warning/beige */
+  
+  /* Border Colors */
+  --color-border-primary: rgba(203, 183, 155, 1.00); /* Beige border */
+  --color-border-secondary: rgba(94, 210, 240, 1);    /* Teal border */
+  --color-border-dark: rgba(40, 40, 40, 1);           /* Dark border */
+  --color-border-light: rgba(255, 229, 192, 1);       /* Light border */
+  
+  /* Basic Colors */
+  --color-white: rgb(255, 255, 255);                 /* Pure white */
+  --color-white-rgb: 255, 255, 255;                  /* White RGB values for rgba() */
+  --color-black: rgb(0, 0, 0);                        /* Pure black */
+  --color-black-rgb: 0, 0, 0;                         /* Black RGB values for rgba() */
+  
+  /* ============================================
+     TYPOGRAPHY
+     ============================================ */
+  
+  /* Font Families */
+  --font-family-primary: "Roboto", "Open-sans", sans-serif;
+  --font-family-system: system-ui, -apple-system, sans-serif;
+  --font-family-retro: "Press Start 2P", "Courier New", monospace;
+  --font-family-mono: monospace, "Courier New", "Lucida Console", monospace;
+  
+  /* Font Sizes - Base Scale */
+  --font-size-xs: 0.65rem;      /* 10.4px */
+  --font-size-sm: 0.75rem;      /* 12px */
+  --font-size-base: 1rem;        /* 16px */
+  --font-size-lg: 1.125rem;      /* 18px */
+  --font-size-xl: 1.25rem;       /* 20px */
+  --font-size-2xl: 1.5rem;       /* 24px */
+  --font-size-3xl: 1.875rem;     /* 30px */
+  --font-size-4xl: 2.25rem;      /* 36px */
+  
+  /* Typography - Semantic Element Font Sizes */
+  /* These can be adjusted to change all headings/paragraphs site-wide */
+  --font-size-h1-min: 1.75rem;   /* Minimum size for h1 */
+  --font-size-h1-max: 2.5rem;    /* Maximum size for h1 */
+  --font-size-h2-min: 1.5rem;     /* Minimum size for h2 */
+  --font-size-h2-max: 2rem;      /* Maximum size for h2 */
+  --font-size-h3-min: 1.25rem;   /* Minimum size for h3 */
+  --font-size-h3-max: 1.75rem;   /* Maximum size for h3 */
+  --font-size-h4-min: 1.125rem;  /* Minimum size for h4 */
+  --font-size-h4-max: 1.5rem;    /* Maximum size for h4 */
+  --font-size-h5: var(--font-size-lg);  /* h5 uses lg size */
+  --font-size-h6: var(--font-size-base); /* h6 uses base size */
+  --font-size-p-min: var(--font-size-sm); /* Minimum size for paragraphs */
+  --font-size-p-max: var(--font-size-base); /* Maximum size for paragraphs */
+  
+  /* Console-specific font sizes (for retro font) - Natural progression from xs */
+  --font-size-console-p: var(--font-size-xs);      /* 0.65rem - Paragraphs (base) */
+  --font-size-console-h3: var(--font-size-sm);    /* 0.75rem - h3 (one step up) */
+  --font-size-console-h2: var(--font-size-base);   /* 1rem - h2 (two steps up) */
+  --font-size-console-h1: var(--font-size-2xl);     /* 1.5rem - h1 uses 2xl */
+  --font-size-console-title: var(--font-size-base); /* Console title size */
+  --font-size-console-base: var(--font-size-xs);   /* Base size matches p */
+  
+  /* Font Weights */
+  --font-weight-normal: 400;
+  --font-weight-medium: 500;
+  --font-weight-bold: 700;
+  
+  /* Letter Spacing */
+  --letter-spacing-tight: -0.025em;
+  --letter-spacing-normal: 0;
+  --letter-spacing-wide: 0.125em;  /* 2px equivalent */
+  --letter-spacing-wider: 0.25em;
+  
+  /* Line Heights */
+  --line-height-tight: 1.2;
+  --line-height-normal: 1.5;
+  --line-height-relaxed: 1.75;
+  
+  /* ============================================
+     SPACING SYSTEM
+     ============================================ */
+  
+  /* Base spacing unit: 4px (0.25rem) - Industry Standard Scale */
+  --spacing-0: 0;
+  --spacing-1: 0.25rem;   /* 4px */
+  --spacing-2: 0.5rem;    /* 8px */
+  --spacing-3: 0.75rem;   /* 12px */
+  --spacing-4: 1rem;      /* 16px */
+  --spacing-5: 1.25rem;   /* 20px */
+  --spacing-6: 1.5rem;    /* 24px */
+  --spacing-8: 2rem;      /* 32px */
+  --spacing-10: 2.5rem;   /* 40px */
+  --spacing-12: 3rem;     /* 48px */
+  --spacing-16: 4rem;     /* 64px */
+  --spacing-20: 5rem;     /* 80px */
+  --spacing-24: 6rem;     /* 96px */
+  
+  /* Legacy aliases for backward compatibility */
+  --spacing-xs: var(--spacing-2);
+  --spacing-sm: var(--spacing-3);
+  --spacing-md: var(--spacing-4);
+  --spacing-lg: var(--spacing-6);
+  --spacing-xl: var(--spacing-8);
+  
+  /* ============================================
+     BORDERS
+     ============================================ */
+  
+  /* Border Widths - Base (Mobile) */
+  --border-width-none: 0;
+  --border-width-thin: 1px;
+  --border-width-medium: 2px;
+  --border-width-thick: 3px;
+  --border-width-thicker: 4px;
+  
+  /* Border Widths - Responsive (scales with viewport) */
+  --border-width-thin-responsive: clamp(0.5px, 0.1vw, 1px);
+  --border-width-medium-responsive: clamp(1px, 0.15vw, 2px);
+  --border-width-thick-responsive: clamp(1.5px, 0.2vw, 3px);
+  --border-width-thicker-responsive: clamp(2px, 0.25vw, 4px);
+  
+  /* Border Styles */
+  --border-style-solid: solid;
+  --border-style-dotted: dotted;
+  --border-style-dashed: dashed;
+  
+  /* Border Radius */
+  --radius-none: 0;
+  --radius-sm: 0.25rem;    /* 4px */
+  --radius-md: 0.5rem;      /* 8px */
+  --radius-lg: 0.75rem;     /* 12px */
+  --radius-xl: 1rem;        /* 16px */
+  --radius-2xl: 1.25rem;    /* 20px */
+  --radius-3xl: 1.5rem;     /* 24px */
+  --radius-full: 9999px;     /* Fully rounded */
+  
+  /* Common Border Radius Values from Original */
+  --radius-10: 10px;
+  --radius-15: 15px;
+  --radius-20: 20px;
+  --radius-25: 25px;
+  --radius-30: 30px;
+  
+  /* ============================================
+     SHADOWS
+     ============================================ */
+  
+  /* Drop Shadows - Teal Accent (from original) */
+  --shadow-teal-sm: drop-shadow(6px 0px 0.5px rgba(87, 189, 206, 0.1));
+  --shadow-teal-md: drop-shadow(6px 0px 0.5px rgba(87, 189, 206, 0.15));
+  --shadow-teal-lg: drop-shadow(6px 0px 0.5px rgba(87, 189, 206, 0.2));
+  --shadow-teal-xl: drop-shadow(6px 0px 0.5px rgba(87, 189, 206, 0.25));
+  --shadow-teal-2xl: drop-shadow(8px 0px 0.5px rgba(87, 189, 206, 0.1));
+  --shadow-teal-3xl: drop-shadow(8px 0px 0.5px rgba(87, 189, 206, 0.25));
+  
+  /* Drop Shadows - Dark */
+  --shadow-dark-sm: drop-shadow(0px 0px 3px rgba(10, 10, 10, 1));
+  --shadow-dark-md: drop-shadow(0px 0px 4px rgba(10, 10, 10, 0.5));
+  
+  /* Combined Shadows (from original) */
+  --shadow-combined: 
+    drop-shadow(0px 0px 3px rgba(10, 10, 10, 1)) 
+    drop-shadow(6px 1px 1px rgba(87, 189, 206, 0.1)) 
+    drop-shadow(0px 0px 4px rgba(87, 189, 206, 0.3));
+  
+  /* Box Shadows - Modern Standard */
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  --shadow-2xl: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  
+  /* ============================================
+     OPACITY
+     ============================================ */
+  
+  --opacity-0: 0;
+  --opacity-25: 0.25;
+  --opacity-40: 0.4;
+  --opacity-50: 0.5;
+  --opacity-55: 0.55;
+  --opacity-65: 0.65;
+  --opacity-70: 0.7;
+  --opacity-75: 0.75;
+  --opacity-80: 0.8;
+  --opacity-85: 0.85;
+  --opacity-90: 0.9;
+  --opacity-95: 0.95;
+  --opacity-100: 1;
+  
+  /* ============================================
+     TRANSITIONS & ANIMATIONS
+     ============================================ */
+  
+  /* Transition Durations */
+  --transition-fast: 150ms;
+  --transition-base: 250ms;
+  --transition-slow: 300ms;
+  --transition-slower: 500ms;
+  
+  /* Transition Timing Functions */
+  --ease-in: cubic-bezier(0.4, 0, 1, 1);
+  --ease-out: cubic-bezier(0, 0, 0.2, 1);
+  --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+  
+  /* Animation Durations */
+  --animation-fast: 0.5s;
+  --animation-base: 1s;
+  --animation-slow: 2s;
+  --animation-slower: 4s;
+  --animation-slowest: 5s;
+  
+  /* ============================================
+     Z-INDEX SCALE
+     ============================================ */
+  
+  --z-base: 1;
+  --z-dropdown: 1000;
+  --z-sticky: 1020;
+  --z-fixed: 1030;
+  --z-modal-backdrop: 1040;
+  --z-modal: 1050;
+  --z-popover: 1060;
+  --z-tooltip: 1070;
+  --z-max: 100000;
+  
+  /* ============================================
+     BREAKPOINTS (for reference in JS/media queries)
+     ============================================ */
+  
+  --breakpoint-sm: 640px;
+  --breakpoint-md: 768px;
+  --breakpoint-lg: 1024px;
+  --breakpoint-xl: 1280px;
+  --breakpoint-2xl: 1536px;
+  
+  /* ============================================
+     LAYOUT
+     ============================================ */
+  
+  /* Container Widths */
+  --container-sm: 640px;
+  --container-md: 768px;
+  --container-lg: 1024px;
+  --container-xl: 1280px;
+  --container-2xl: 1536px;
+  
+  /* Max Widths */
+  --max-width-xs: 20rem;    /* 320px */
+  --max-width-sm: 24rem;    /* 384px */
+  --max-width-md: 28rem;    /* 448px */
+  --max-width-lg: 32rem;    /* 512px */
+  --max-width-xl: 36rem;    /* 576px */
+  --max-width-2xl: 42rem;   /* 672px */
+  --max-width-3xl: 48rem;   /* 768px */
+  --max-width-4xl: 56rem;   /* 896px */
+  --max-width-5xl: 64rem;   /* 1024px */
+  --max-width-6xl: 72rem;   /* 1152px */
+  --max-width-7xl: 80rem;   /* 1280px */
+  --max-width-full: 100%;
+  
+  /* ============================================
+     SCROLLBAR STYLING
+     ============================================ */
+  
+  --scrollbar-width: 10px;
+  --scrollbar-track-bg: rgba(0, 0, 0, 0.5);
+  --scrollbar-thumb-bg: rgba(255, 229, 192, 0.95);
+  --scrollbar-thumb-radius: 10px;
+  
+  /* ============================================
+     INPUT STYLING
+     ============================================ */
+  
+  --input-height: 40px;
+  --input-padding-x: 1rem;
+  --input-padding-y: 0.5rem;
+  --input-border-radius: var(--radius-25);
+  --input-bg: rgba(149, 245, 227, 0.1);
+  --input-border: medium solid rgba(99, 195, 177, 0.25);
+  --input-placeholder-color: rgba(99, 195, 177, 1);
+  
+  /* ============================================
+     BUTTON STYLING
+     ============================================ */
+  
+  --button-padding-x: 0.5rem;
+  --button-padding-y: 0.5rem;
+  --button-border-radius: var(--radius-30);
+  --button-font-weight: var(--font-weight-bold);
+  --button-letter-spacing: var(--letter-spacing-wide);
+  
+  /* ============================================
+     TOOLTIP STYLING
+     ============================================ */
+  
+  --tooltip-bg: rgba(68, 71, 70, 0.90);
+  --tooltip-border: thin solid rgba(203, 183, 155, 1.00);
+  --tooltip-color: var(--color-primary);
+  --tooltip-padding: 20px;
+  --tooltip-radius: var(--radius-20);
+  
+  /* ============================================
+     CARD STYLING
+     ============================================ */
+  
+  --card-bg: var(--color-bg-light);
+  --card-border: 2px dotted var(--color-accent-beige);
+  --card-radius: var(--radius-25);
+  --card-padding: var(--spacing-6);
+  --card-shadow: var(--shadow-combined);
+  
+  /* ============================================
+     IMAGES
+     ============================================ */
+  
+  /* Image Paths (Background Images) - Using relative paths for domain compatibility */
+  --image-path-bg-1: url("../img/background1.jpg");
+  --image-path-bg-1b: url("../img/background1b.jpg");
+  --image-path-bg-2: url("../img/background2.jpg");
+  --image-path-bg-2b: url("../img/background2b.jpg");
+  --image-path-bg-3: url("../img/background3.jpg");
+  --image-path-bg-3b: url("../img/background3b.jpg");
+  --image-path-bg-4: url("../img/background4.jpg");
+  --image-path-bg-4b: url("../img/background4b.jpg");
+  --image-path-console: url("../img/Comp-w-inputs-06.png");
+  --image-path-card-bg: url("../img/01_CardBGtexture.png");
+  --image-path-title: url("../img/Title_Card_Start.png");
+  
+  /* Image Sizing - Fixed (for icons/buttons) */
+  --image-size-icon: 40px;
+  --image-size-icon-small: 28px;
+  --image-size-icon-large: 50px;
+  --image-size-button: 40px;
+  
+  /* Image Sizing - Responsive (use clamp for fluid sizing) */
+  --image-size-card-width: clamp(280px, 30vw, 375px);
+  --image-size-card-height: clamp(390px, 40vw, 518px);
+  --image-size-creature: clamp(227px, 25vw, 303px);
+  --image-size-gallery-thumb: clamp(120px, 15vw, 160px);
+  --image-size-gallery-full: clamp(243px, 30vw, 325px);
+  --image-size-title-width: clamp(50%, 70%, 90%);
+  
+  /* Image Effects - Drop Shadows */
+  --image-shadow-default: drop-shadow(5px 0px 0.5px rgba(var(--color-secondary-rgb), 0.1));
+  --image-shadow-medium: drop-shadow(6px 0px 0.5px rgba(var(--color-secondary-rgb), 0.1));
+  --image-shadow-large: drop-shadow(8px 0px 0.5px rgba(var(--color-secondary-rgb), 0.1));
+  --image-shadow-hover: drop-shadow(8px 0px 0.5px rgba(var(--color-secondary-rgb), 0.25)) 
+                         brightness(125%) saturate(200%);
+  --image-shadow-title: drop-shadow(6px 0px 0.5px rgba(var(--color-secondary-rgb), 0.1));
+  --image-shadow-title-hover: drop-shadow(6px 0px 0.5px rgba(var(--color-secondary-rgb), 0.15)) 
+                               saturate(200%);
+  
+  /* Object Fit */
+  --image-fit-cover: cover;
+  --image-fit-contain: contain;
+  --image-fit-fill: fill;
+  --image-fit-none: none;
+  --image-fit-scale-down: scale-down;
+  
+  /* Object Position */
+  --image-position-center: center;
+  --image-position-bottom: bottom;
+  --image-position-top: top;
+  --image-position-left: left;
+  --image-position-right: right;
+  
+  /* Background Image Properties */
+  --bg-image-repeat: no-repeat;
+  --bg-image-position: center center;
+  --bg-image-attachment: fixed;
+  --bg-image-size: cover;
+  
+  /* Retro Cursor Definitions - SVG Data URLs */
+  /* Terminal Cursor: Keep original terminal cursor */
+  --cursor-retro-terminal: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><rect x="0" y="0" width="2" height="20" fill="%235ED2F0"/><rect x="2" y="18" width="6" height="2" fill="%235ED2F0"/></svg>') 0 0, crosshair;
+  
+  /* Pointer Cursor for Links and Buttons: Classic pixelated hand with pointing finger (from pointer-01th.svg) */
+  --cursor-retro-link: url('../img/cursors_icons/pointer-01th.svg') 0 0, pointer;
+  
+  /* Pointer Cursor for Buttons: Same as link (unified hand cursor) */
+  --cursor-retro-button: var(--cursor-retro-link);
+  
+  /* Text Cursor: Simple vertical line with blinking effect */
+  --cursor-retro-text: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="16" height="20" viewBox="0 0 16 20"><rect x="0" y="0" width="2" height="20" fill="%235ED2F0"/></svg>') 1 0, text;
+  
+  /* Select Cursor: Crosshair with dots */
+  --cursor-retro-select: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 20 20"><rect x="9" y="0" width="2" height="20" fill="%235ED2F0"/><rect x="0" y="9" width="20" height="2" fill="%235ED2F0"/><circle cx="9" cy="9" r="1.5" fill="%235ED2F0"/></svg>') 10 10, crosshair;
+  
+  /* Default Cursor: Pixelated cursor from cursor-01.svg */
+  --cursor-retro-default: url('../img/cursors_icons/cursor-01.svg') 0 0, default;
+}
+
+/* ============================================
+   DARK MODE SUPPORT (Future Enhancement)
+   ============================================ */
+
+/* Dark mode support - placeholder for future implementation */
+/* @media (prefers-color-scheme: dark) {
+  :root {
+    --color-bg-primary: rgb(20, 20, 20);
+  }
+} */
