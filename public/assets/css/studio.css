@@ -93,9 +93,24 @@
   z-index: 5;
   pointer-events: none;
   color: #1a1a1a;
-  /* Must match live Card-o-Bot face: Press Start 2P is wide; layout caps assume it. */
+  /* Default face chrome; per-field inline/class overrides for sans meta/power. */
   font-family: var(--font-family-retro, "Press Start 2P", "Courier New", monospace);
   padding: 0;
+}
+
+.studio-text .studio-type,
+.studio-text .studio-type *,
+.studio-text .studio-height,
+.studio-text .studio-height *,
+.studio-text .studio-mass,
+.studio-text .studio-mass *,
+.studio-text .studio-credit,
+.studio-text .studio-credit *,
+.studio-text .studio-power,
+.studio-text .studio-power *,
+.studio-text .studio-ability,
+.studio-text .studio-ability * {
+  font-family: Roboto, "Noto Sans", "Segoe UI", sans-serif !important;
 }
 
 .studio-tools {

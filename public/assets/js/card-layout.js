@@ -29,7 +29,8 @@
       ability_name: 12,
       ability_line: 8,
       power_value: 8,
-      bio: 90,
+      // Soft cap only; face shrink-to-fit owns the real well budget.
+      bio: 220,
     },
     NAME_INKS: {
       slate: 'rgba(88,88,88,1)',
@@ -130,7 +131,7 @@
     BIO: {
       x: sx(72), y: sy(374), w: sx(248), h: sy(42),
       fontSize: 11, fontWeight: '400', color: 'rgba(44,127,162,1)',
-      align: 'left', maxLines: 5, lineHeight: 1.35, minFontSize: 7,
+      align: 'left', maxLines: 5, lineHeight: 1.28, minFontSize: 5,
     },
     // Sans to match printed INFERENCE POWER / SPECIAL ABILITY; left-aligned in value column.
     POWER: {

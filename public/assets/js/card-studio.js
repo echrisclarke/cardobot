@@ -189,6 +189,8 @@
         'box-sizing:border-box',
         'margin:0',
       ].filter(Boolean).join(';');
+      // Ensure sans fields win over .studio-text Press Start inheritance.
+      el.style.setProperty('font-family', faceFont, 'important');
       this.textLayer.appendChild(el);
       return el;
     }
@@ -226,24 +228,41 @@
       el.style.overflow = 'hidden';
       el.style.textOverflow = 'clip';
       el.style.whiteSpace = multi ? 'normal' : 'nowrap';
+      el.style.wordBreak = multi ? 'normal' : '';
+      el.style.overflowWrap = multi ? 'anywhere' : '';
 
       const apply = (size) => {
         this._applyFaceFontSize(el, size);
       };
-      const overflows = () => multi
-        ? (el.scrollHeight > el.clientHeight + 1 || el.scrollWidth > el.clientWidth + 1)
-        : (el.scrollWidth > el.clientWidth + 1);
+      // Grid + overflow:hidden can under-report; use scroll metrics + a probe clone.
+      const overflows = () => {
+        if (!multi) return el.scrollWidth > el.clientWidth + 1;
+        if (el.scrollHeight > el.clientHeight + 1 || el.scrollWidth > el.clientWidth + 1) {
+          return true;
+        }
+        const probe = el.cloneNode(true);
+        probe.style.cssText = el.style.cssText
+          + ';position:absolute;left:-9999px;top:0;visibility:hidden;height:auto;max-height:none;overflow:visible';
+        probe.style.width = el.clientWidth + 'px';
+        document.body.appendChild(probe);
+        const tooTall = probe.scrollHeight > el.clientHeight + 1;
+        probe.remove();
+        return tooTall;
+      };
 
       apply(fs);
-      for (let i = 0; i < 48 && overflows() && fs > minFs; i++) {
+      // Force layout so the first overflow check is accurate.
+      void el.offsetHeight;
+      for (let i = 0; i < 64 && overflows() && fs > minFs; i++) {
         fs -= 1;
         apply(fs);
+        void el.offsetHeight;
       }
       // Last resort: trim at a word boundary (never leave "...").
-      // Keep Mass/Height labels intact; shorten numbers before chopping the label.
       if (overflows()) {
         apply(minFs);
         fs = minFs;
+        void el.offsetHeight;
         while (value.length > 1 && overflows()) {
           const unitMatch = value.match(/(\d+(?:\.\d+)?)\s+([a-z]+)\s*$/i);
           if (unitMatch && unitMatch[1].length > 1) {
@@ -640,11 +659,15 @@
         ctx.drawImage(frame, 0, 0, w, h);
       } catch (e) { /* */ }
 
-      const drawBox = (box, text) => {
+      const drawBox = (box, text, fitEl) => {
         if (!text || !box) return;
         ctx.fillStyle = box.color || '#222';
         const faceFont = this._faceFontForBox(box);
-        ctx.font = `${box.fontWeight || '400'} ${(box.fontSize || 14) * scale}px ${faceFont}`;
+        const fitFs = fitEl && fitEl.dataset && fitEl.dataset.fitSize
+          ? Number(fitEl.dataset.fitSize)
+          : (box.fontSize || 14);
+        const fs = (Number.isFinite(fitFs) && fitFs > 0 ? fitFs : (box.fontSize || 14)) * scale;
+        ctx.font = `${box.fontWeight || '400'} ${fs}px ${faceFont}`;
         const align = box.align === 'center' ? 'center' : (box.align === 'right' ? 'right' : 'left');
         ctx.textAlign = align;
         let x = box.x * scale;
@@ -654,7 +677,7 @@
         const y = box.y * scale + boxH * 0.72;
         if ((box.maxLines || 1) > 1) {
           ctx.textAlign = 'left';
-          wrapText(ctx, text, box.x * scale, y, (box.w || 400) * scale, (box.fontSize || 14) * 1.25 * scale, box.maxLines);
+          wrapText(ctx, text, box.x * scale, y, (box.w || 400) * scale, fs * 1.25, box.maxLines);
         } else {
           const t = (box.transform === 'uppercase') ? String(text).toUpperCase() : String(text);
           ctx.fillText(t, x, y);
@@ -664,25 +687,25 @@
 
       const nameColor = this.nickEl ? this.nickEl.style.color : (layout.NICKNAME && layout.NICKNAME.color);
       const statsColor = (this.statEls.npo && this.statEls.npo.style.color) || layout.STAT_COLOR;
-      drawBox(Object.assign({}, layout.NICKNAME, { color: nameColor }), this.nickEl.textContent);
-      if (this.creditEl && this.showCredit) drawBox(layout.CREDIT, this.creditEl.textContent);
-      if (this.typeEl) drawBox(layout.TYPE, this.typeEl.textContent);
-      if (this.heightEl) drawBox(layout.HEIGHT, this.heightEl.textContent);
-      if (this.massEl) drawBox(layout.MASS, this.massEl.textContent);
-      drawBox(layout.BIO, this.bioEl.textContent);
+      drawBox(Object.assign({}, layout.NICKNAME, { color: nameColor }), this.nickEl.textContent, this.nickEl);
+      if (this.creditEl && this.showCredit) drawBox(layout.CREDIT, this.creditEl.textContent, this.creditEl);
+      if (this.typeEl) drawBox(layout.TYPE, this.typeEl.textContent, this.typeEl);
+      if (this.heightEl) drawBox(layout.HEIGHT, this.heightEl.textContent, this.heightEl);
+      if (this.massEl) drawBox(layout.MASS, this.massEl.textContent, this.massEl);
+      drawBox(layout.BIO, this.bioEl.textContent, this.bioEl);
       if (layout.POWER) {
         const pTitle = this.powerEl.dataset.powerTitle || '';
         const pValue = this.powerEl.dataset.powerValue || '';
         const powerLine = pValue ? (pTitle + '  ' + pValue).trim() : (pTitle || this.powerEl.textContent);
-        drawBox(layout.POWER, powerLine);
+        drawBox(layout.POWER, powerLine, this.powerEl);
       }
       if (layout.ABILITY) {
         const aTitle = this.abilityEl.dataset.abilityTitle || '';
         const aValue = this.abilityEl.dataset.abilityValue || '';
         const abilityLine = aValue ? (aTitle + '  ' + aValue).trim() : (aTitle || this.abilityEl.textContent);
-        drawBox(layout.ABILITY, abilityLine);
+        drawBox(layout.ABILITY, abilityLine, this.abilityEl);
       }
-      drawBox(layout.HP, this.hpEl.textContent);
+      drawBox(layout.HP, this.hpEl.textContent, this.hpEl);
       (layout.STATS || []).forEach((s) => {
         drawBox({
           x: s.x, y: s.y, w: s.w, fontSize: s.fontSize, fontWeight: '700',

@@ -18,6 +18,22 @@
   font-family: var(--font-family-retro, "Press Start 2P", "Courier New", monospace) !important;
 }
 
+/* Face meta + power/ability use plain sans (override shell Press Start). */
+.cob-app-shell .studio-type,
+.cob-app-shell .studio-type *,
+.cob-app-shell .studio-height,
+.cob-app-shell .studio-height *,
+.cob-app-shell .studio-mass,
+.cob-app-shell .studio-mass *,
+.cob-app-shell .studio-credit,
+.cob-app-shell .studio-credit *,
+.cob-app-shell .studio-power,
+.cob-app-shell .studio-power *,
+.cob-app-shell .studio-ability,
+.cob-app-shell .studio-ability * {
+  font-family: Roboto, "Noto Sans", "Segoe UI", sans-serif !important;
+}
+
 .cob-app-shell.open {
   display: flex;
   animation: cobAppIn 0.28s ease-out;
