@@ -226,43 +226,44 @@ body.chat-page .chat-messages.show-cardy-bg {
     </div>
 
     <!-- Subsequent stages (face appearing, Cardy messages, suggestion chips) appended dynamically. -->
+
+    <!-- Confirm/form lives inside chat scroll so it never crushes the message flex region. -->
+    <div class="confirm-panel" id="confirmPanel">
+        <p id="confirmPanelTitle"><strong>Your card so far</strong></p>
+        <p class="confirm-hint" id="confirmHint">Tweak anything, then paint.</p>
+        <div class="confirm-form-extra" id="confirmFormExtra" hidden>
+          <label data-i18n="form.kind">Kind
+            <div class="confirm-kind-chips" id="confirmKindChips" aria-label="Card kind"></div>
+            <input type="hidden" id="confirmType" value="">
+          </label>
+          <label data-i18n-label="form.who">Who / what are they?
+            <input type="text" id="confirmSubject" maxlength="120" placeholder="e.g. rusty dock crane bot" data-i18n-placeholder="form.who_ph">
+          </label>
+        </div>
+        <label data-i18n-label="form.nickname">Nickname
+          <input type="text" id="confirmNickname" maxlength="16" placeholder="Type your own callsign" data-i18n-placeholder="form.nickname_ph">
+        </label>
+        <div class="confirm-nick-chips" id="confirmNickChips" aria-label="Suggested names from Cardy"></div>
+        <label data-i18n-label="form.vibe">Vibe <input type="text" id="confirmVibe" maxlength="120" placeholder="mood or energy" data-i18n-placeholder="form.vibe_ph"></label>
+        <label data-i18n-label="form.details">Details / look <textarea id="confirmDetails" rows="2" maxlength="500" placeholder="what they look like" data-i18n-placeholder="form.details_ph"></textarea></label>
+        <div class="confirm-form-extra" id="confirmFormExtraMore" hidden>
+          <label data-i18n-label="form.setting">Setting <span class="confirm-optional" data-i18n="form.optional">(optional)</span>
+            <input type="text" id="confirmSetting" maxlength="160" placeholder="where they are" data-i18n-placeholder="form.setting_ph">
+          </label>
+          <label data-i18n-label="form.stake">Stake <span class="confirm-optional" data-i18n="form.optional">(optional)</span>
+            <input type="text" id="confirmStake" maxlength="160" placeholder="what matters to them" data-i18n-placeholder="form.stake_ph">
+          </label>
+        </div>
+        <p class="confirm-form-error" id="confirmFormError" hidden></p>
+        <div class="reveal-actions">
+            <button type="button" id="confirmPaintBtn" data-i18n="form.paint">Paint it!</button>
+            <button type="button" class="secondary" id="confirmUpdateBtn" data-i18n="form.update">Update</button>
+        </div>
+    </div>
 </div>
 
 <div class="wizard-render-button-container hidden" id="renderButtonContainer">
     <button type="button" class="wizard-render-button" id="renderButton">Paint my card</button>
-</div>
-
-<div class="confirm-panel" id="confirmPanel">
-    <p id="confirmPanelTitle"><strong>Your card so far</strong></p>
-    <p class="confirm-hint" id="confirmHint">Tweak anything, then paint.</p>
-    <div class="confirm-form-extra" id="confirmFormExtra" hidden>
-      <label>Kind
-        <div class="confirm-kind-chips" id="confirmKindChips" aria-label="Card kind"></div>
-        <input type="hidden" id="confirmType" value="">
-      </label>
-      <label>Who / what are they?
-        <input type="text" id="confirmSubject" maxlength="120" placeholder="e.g. rusty dock crane bot">
-      </label>
-    </div>
-    <label>Nickname
-      <input type="text" id="confirmNickname" maxlength="16" placeholder="Type your own callsign">
-    </label>
-    <div class="confirm-nick-chips" id="confirmNickChips" aria-label="Suggested names from Cardy"></div>
-    <label>Vibe <input type="text" id="confirmVibe" maxlength="120" placeholder="mood or energy"></label>
-    <label>Details / look <textarea id="confirmDetails" rows="2" maxlength="500" placeholder="what they look like"></textarea></label>
-    <div class="confirm-form-extra" id="confirmFormExtraMore" hidden>
-      <label>Setting <span class="confirm-optional">(optional)</span>
-        <input type="text" id="confirmSetting" maxlength="160" placeholder="where they are">
-      </label>
-      <label>Stake <span class="confirm-optional">(optional)</span>
-        <input type="text" id="confirmStake" maxlength="160" placeholder="what matters to them">
-      </label>
-    </div>
-    <p class="confirm-form-error" id="confirmFormError" hidden></p>
-    <div class="reveal-actions">
-        <button type="button" id="confirmPaintBtn">Paint it!</button>
-        <button type="button" class="secondary" id="confirmUpdateBtn">Update</button>
-    </div>
 </div>
 
 <div class="wizard-studio-panel" id="studioPanel">
@@ -333,6 +334,10 @@ body.chat-page .chat-messages.show-cardy-bg {
         step: 'greeting',
         mode: null,
         path: null,
+        locale: 'en',
+        localePicked: false,
+        awaitingOtherLocale: false,
+        i18n: {},
         pendingRender: false,
         pendingRenderStatus: '',
         renderInFlight: false,
@@ -359,6 +364,81 @@ body.chat-page .chat-messages.show-cardy-bg {
         imageLoadingElement: null, // inline placeholder shown while painting
         imageElement: null,        // inline finished image
     };
+
+    function t(key, fallback) {
+        const v = state.i18n && state.i18n[key];
+        return (v != null && v !== '') ? v : (fallback != null ? fallback : key);
+    }
+
+    function applyI18n() {
+        document.querySelectorAll('[data-i18n]').forEach((el) => {
+            const key = el.getAttribute('data-i18n');
+            if (!key) return;
+            el.textContent = t(key, el.textContent);
+        });
+        document.querySelectorAll('[data-i18n-placeholder]').forEach((el) => {
+            const key = el.getAttribute('data-i18n-placeholder');
+            if (!key) return;
+            el.setAttribute('placeholder', t(key, el.getAttribute('placeholder') || ''));
+        });
+        document.querySelectorAll('[data-i18n-label]').forEach((el) => {
+            const key = el.getAttribute('data-i18n-label');
+            if (!key) return;
+            const labelText = t(key);
+            const input = el.querySelector('input, textarea, select, .confirm-kind-chips');
+            if (!input) {
+                el.textContent = labelText;
+                return;
+            }
+            // Keep first text node as the label; preserve controls.
+            let set = false;
+            el.childNodes.forEach((node) => {
+                if (set) return;
+                if (node.nodeType === Node.TEXT_NODE && node.textContent.trim() !== '') {
+                    node.textContent = labelText + ' ';
+                    set = true;
+                }
+            });
+            if (!set) {
+                el.insertBefore(document.createTextNode(labelText + ' '), el.firstChild);
+            }
+        });
+        const sendBtn = document.querySelector('.chat-send-btn span');
+        if (sendBtn) sendBtn.textContent = t('chat.send', sendBtn.textContent);
+        if ($messageInput) $messageInput.placeholder = t('chat.placeholder', $messageInput.placeholder);
+        const continueBtn = document.querySelector('#introContinueBtn .continue-button');
+        if (continueBtn) continueBtn.textContent = t('chat.continue', continueBtn.textContent);
+        const loadingText = document.querySelector('#chatLoadingBar .loading-text');
+        if (loadingText) loadingText.textContent = t('chat.initializing', loadingText.textContent);
+        if ($renderButton) $renderButton.textContent = t('studio.paint', $renderButton.textContent);
+    }
+
+    async function loadLocalePack(code) {
+        try {
+            const res = await fetch(basePath + '/api/locale.php' + (code ? ('?code=' + encodeURIComponent(code)) : ''), {
+                credentials: 'same-origin',
+            });
+            const data = await res.json();
+            if (data && data.ok !== false && data.strings) {
+                state.i18n = data.strings;
+                state.locale = data.locale || code || 'en';
+                applyI18n();
+            }
+        } catch (err) {
+            console.warn('locale pack load failed', err);
+        }
+    }
+
+    function localeCodeFromChip(text) {
+        const lower = String(text || '').toLowerCase().trim();
+        if (lower === 'english' || lower.includes('english')) return 'en';
+        if (lower === 'español' || lower === 'espanol' || lower.includes('español')) return 'es';
+        if (lower.includes('中文') || lower.includes('mandarin') || lower.includes('chinese')) return 'zh-Hans';
+        if (lower.startsWith('other') || lower === 'otro…' || lower === 'otro...' || lower.includes('其他') || lower.includes('autre') || lower.includes('andere') || lower.includes('その他') || lower.includes('기타') || lower.includes('outro') || lower.includes('altro')) {
+            return 'other';
+        }
+        return null;
+    }
 
     // ============================================================
     //   HTTP helper
@@ -424,6 +504,7 @@ body.chat-page .chat-messages.show-cardy-bg {
             }
         }
     }
+    loadLocalePack();
     preloadGreeting();
 
     function markGreetingReady() {
@@ -786,13 +867,13 @@ body.chat-page .chat-messages.show-cardy-bg {
         const err = document.getElementById('confirmFormError');
         if (title) {
             title.innerHTML = formMode
-                ? '<strong>Build your card</strong>'
-                : '<strong>Your card so far</strong>';
+                ? '<strong>' + t('form.title_form', 'Build your card') + '</strong>'
+                : '<strong>' + t('form.title_chat', 'Your card so far') + '</strong>';
         }
         if (hint) {
             hint.textContent = formMode
-                ? 'Pick a kind, name them, describe the look, then paint. No chat needed.'
-                : 'Tweak anything, then paint.';
+                ? t('form.hint_form', 'Pick a kind, name them, describe the look, then paint. No chat needed.')
+                : t('form.hint_chat', 'Tweak anything, then paint.');
         }
         if (extra) extra.hidden = !formMode;
         if (extraMore) extraMore.hidden = !formMode;
@@ -814,7 +895,15 @@ body.chat-page .chat-messages.show-cardy-bg {
         document.getElementById('confirmDetails').value = lastConcept.details || '';
         if (formMode) renderConfirmKindChips(lastConcept.type || '');
         renderConfirmNickChips(nickSuggestions);
+        // Keep the form at the end of the scrollable chat transcript.
+        if ($confirmPanel.parentElement !== $chatMessages) {
+            $chatMessages.appendChild($confirmPanel);
+        } else {
+            $chatMessages.appendChild($confirmPanel);
+        }
         $confirmPanel.classList.add('visible');
+        $chatMessages.scrollTop = $chatMessages.scrollHeight;
+        if (typeof applyI18n === 'function') applyI18n();
     }
 
     function renderConfirmKindChips(selected) {
@@ -822,18 +911,24 @@ body.chat-page .chat-messages.show-cardy-bg {
         const typeEl = document.getElementById('confirmType');
         if (!wrap) return;
         wrap.innerHTML = '';
-        const kinds = ['Bot', 'Android', 'Human', 'Critter'];
+        const kinds = [
+            { value: 'Bot', label: t('form.kind_bot', 'Bot') },
+            { value: 'Android', label: t('form.kind_android', 'Android') },
+            { value: 'Human', label: t('form.kind_human', 'Human') },
+            { value: 'Critter', label: t('form.kind_critter', 'Critter') },
+        ];
         const current = String(selected || (typeEl && typeEl.value) || '').trim();
-        kinds.forEach((kind) => {
+        kinds.forEach(({ value: kind, label }) => {
             const btn = document.createElement('button');
             btn.type = 'button';
             btn.className = 'suggestion-button confirm-kind-chip'
                 + (kind.toLowerCase() === current.toLowerCase() ? ' is-selected' : '');
-            btn.textContent = kind;
+            btn.textContent = label;
+            btn.dataset.kind = kind;
             btn.addEventListener('click', () => {
                 if (typeEl) typeEl.value = kind;
                 wrap.querySelectorAll('.confirm-kind-chip').forEach((el) => {
-                    el.classList.toggle('is-selected', el.textContent === kind);
+                    el.classList.toggle('is-selected', el.dataset.kind === kind);
                 });
             });
             wrap.appendChild(btn);
@@ -1028,18 +1123,23 @@ body.chat-page .chat-messages.show-cardy-bg {
     //   The wizard step decides what the user's input means.
     // ============================================================
     function pathValueFromText(lower) {
-        if (lower.includes('talk') || lower.includes('chat') || lower.includes('tell me more')
+        const fast = t('path.fast', 'Yeah, make a card').toLowerCase();
+        const longP = t('path.long', 'Make a detailed one').toLowerCase();
+        const formP = t('path.form', 'Fill out a form').toLowerCase();
+        const chatP = t('path.chat', 'Just chat for now').toLowerCase();
+        if (lower === chatP || lower.includes('talk') || lower.includes('chat') || lower.includes('tell me more')
             || lower.includes('about you') || lower.includes('about the ship') || lower.includes('learn more')) {
             return 'chat';
         }
-        if (lower.includes('fill out a form') || lower.includes('fill in a form')
+        if (lower === formP || lower.includes('fill out a form') || lower.includes('fill in a form')
             || lower.includes('use a form') || lower === 'form'
             || (lower.includes('form') && !lower.includes('transform') && !lower.includes('format'))) {
             return 'form';
         }
-        if (lower.includes('remember') || lower.includes('detailed') || lower.includes('longer') || lower.includes('slow')) {
+        if (lower === longP || lower.includes('remember') || lower.includes('detailed') || lower.includes('longer') || lower.includes('slow')) {
             return 'long';
         }
+        if (lower === fast) return 'fast';
         return 'fast';
     }
 
@@ -1051,7 +1151,20 @@ body.chat-page .chat-messages.show-cardy-bg {
         const step = state.step;
         const lower = text.toLowerCase();
 
-        if (step === 'greeting') {
+        if (step === 'greeting' || state.awaitingOtherLocale) {
+            if (!state.localePicked || state.awaitingOtherLocale) {
+                const code = localeCodeFromChip(text);
+                if (code === 'other') {
+                    sendChat({ action: 'select_locale', value: 'other', user_message: text });
+                    return;
+                }
+                if (code) {
+                    sendChat({ action: 'select_locale', value: code, user_message: text });
+                    return;
+                }
+                sendChat({ action: 'select_locale', user_message: text });
+                return;
+            }
             const value = pathValueFromText(lower);
             sendChat({ action: 'select_path', value, user_message: text });
             return;
@@ -1112,7 +1225,16 @@ body.chat-page .chat-messages.show-cardy-bg {
             sendChat({ user_message: text });
             return;
         }
-        if (step === 'greeting') {
+        if (step === 'greeting' || state.awaitingOtherLocale) {
+            if (!state.localePicked || state.awaitingOtherLocale) {
+                const code = localeCodeFromChip(text);
+                if (code && code !== 'other') {
+                    sendChat({ action: 'select_locale', value: code, user_message: text });
+                } else {
+                    sendChat({ action: 'select_locale', user_message: text });
+                }
+                return;
+            }
             sendChat({ action: 'select_path', value: pathValueFromText(text.toLowerCase()), user_message: text });
             return;
         }
@@ -1143,6 +1265,13 @@ body.chat-page .chat-messages.show-cardy-bg {
             state.step          = data.step || state.step;
             state.mode          = data.mode || state.mode;
             state.path          = data.path || state.path;
+            if (data.locale) state.locale = data.locale;
+            if (typeof data.locale_picked === 'boolean') state.localePicked = data.locale_picked;
+            if (typeof data.awaiting_other_locale === 'boolean') state.awaitingOtherLocale = data.awaiting_other_locale;
+            if (data.locale && data.locale !== (state.i18n && state._packLocale)) {
+                state._packLocale = data.locale;
+                loadLocalePack(data.locale);
+            }
             state.readyToRender = !!data.ready_to_render;
             if (data.visual_concept) {
                 state.visualConcept = data.visual_concept;

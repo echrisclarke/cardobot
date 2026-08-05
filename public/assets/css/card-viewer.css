@@ -149,7 +149,7 @@
   height: 100%;
   object-fit: cover;
   object-position: center center;
-  transform: scale(1.22);
+  transform: scaleX(1.1) scaleY(1.05);
   transform-origin: center center;
 }
 
@@ -159,45 +159,6 @@
   mix-blend-mode: color;
   opacity: 0.45;
   pointer-events: none;
-}
-
-/* Sit above the printed INTELLIGENT / TRADING CARD / GENERATING MACHINE band. */
-.cob-back-plate {
-  position: absolute;
-  left: 14%;
-  right: 14%;
-  bottom: 22%;
-  text-align: center;
-  color: rgba(240, 250, 255, 0.92);
-  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.65);
-  pointer-events: none;
-  z-index: 2;
-  max-height: 12%;
-  overflow: hidden;
-}
-
-.cob-back-plate strong {
-  display: block;
-  font-size: clamp(0.22rem, 2.1cqw, 0.34rem);
-  letter-spacing: 0;
-  line-height: 1.15;
-  margin: 0 auto 0.2rem;
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: clip;
-  white-space: nowrap;
-}
-
-.cob-back-plate span {
-  display: block;
-  font-size: clamp(0.18rem, 1.6cqw, 0.26rem);
-  letter-spacing: 0;
-  opacity: 0.85;
-  line-height: 1.25;
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: clip;
-  white-space: nowrap;
 }
 
 .cob-dock {

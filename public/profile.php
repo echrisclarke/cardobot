@@ -18,6 +18,8 @@ require_auth();
 require_once __DIR__ . '/includes/google-auth.php';
 require_once __DIR__ . '/includes/cards.php';
 require_once __DIR__ . '/includes/profile.php';
+require_once __DIR__ . '/includes/i18n.php';
+i18n_seed_presets_if_needed();
 
 $user = get_logged_in_user();
 if (!$user || empty($user['username'])) {
@@ -91,6 +93,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $activeTab = 'security';
             }
         }
+    } elseif ($action === 'set_locale') {
+        require_once __DIR__ . '/includes/i18n.php';
+        $code = trim((string)($_POST['preferred_locale'] ?? 'en'));
+        $raw = trim((string)($_POST['other_language'] ?? ''));
+        if ($code === 'other' && $raw !== '') {
+            $validated = i18n_validate_language($raw);
+            if (!empty($validated['ok'])) {
+                $pack = i18n_ensure_locale($validated['code'], $validated['name_en'], $validated['name_native']);
+                i18n_set_session_locale($pack['code']);
+                i18n_save_user_locale((int)$userId, $pack['code']);
+                $success = 'Language saved.';
+            } else {
+                $error = $validated['message'] ?? 'That language is not available.';
+            }
+        } else {
+            $pack = i18n_ensure_locale($code);
+            i18n_set_session_locale($pack['code']);
+            i18n_save_user_locale((int)$userId, $pack['code']);
+            $success = 'Language saved.';
+        }
+        $user = get_user_by_id((int)$userId) ?: $user;
+        $activeTab = 'profile';
     } elseif ($action === 'change_username') {
         $newUsername = trim($_POST['new_username'] ?? '');
         $result = change_username($userId, $newUsername);
@@ -465,6 +489,40 @@ $assetPath = get_asset_path();
                         
                         <div class="form-actions">
                             <button type="submit" class="btn btn-primary">Update Username</button>
+                        </div>
+                    </form>
+
+                    <hr style="margin: var(--spacing-6) 0; border: none; border-top: var(--border-width) solid var(--color-border);">
+
+                    <h3 style="margin-bottom: var(--spacing-4);">Language</h3>
+                    <p class="text-muted" style="margin-bottom: var(--spacing-4); color: var(--color-text-secondary);">
+                        Console and new cards use this language.
+                    </p>
+                    <?php
+                    $currentLocale = i18n_normalize_code((string)($user['preferred_locale'] ?? i18n_session_locale() ?: 'en')) ?: 'en';
+                    ?>
+                    <form method="POST" class="profile-form">
+                        <input type="hidden" name="action" value="set_locale">
+                        <div class="form-group">
+                            <label for="preferred_locale">Language</label>
+                            <select id="preferred_locale" name="preferred_locale" class="form-control">
+                                <?php foreach (I18N_PRESET_LOCALES as $pCode => $meta): ?>
+                                    <option value="<?php echo htmlspecialchars($pCode); ?>" <?php echo $currentLocale === $pCode ? 'selected' : ''; ?>>
+                                        <?php echo htmlspecialchars($meta['name_native'] . ' (' . $meta['name_en'] . ')'); ?>
+                                    </option>
+                                <?php endforeach; ?>
+                                <option value="other" <?php echo !isset(I18N_PRESET_LOCALES[$currentLocale]) ? 'selected' : ''; ?>>Other…</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="other_language">Other language name</label>
+                            <input type="text" id="other_language" name="other_language" class="form-control" maxlength="80"
+                                   placeholder="e.g. Hindi, العربية, cy"
+                                   value="<?php echo !isset(I18N_PRESET_LOCALES[$currentLocale]) ? htmlspecialchars($currentLocale) : ''; ?>">
+                            <small class="form-help">Used when you pick Other. Real natural languages only.</small>
+                        </div>
+                        <div class="form-actions">
+                            <button type="submit" class="btn btn-primary">Save language</button>
                         </div>
                     </form>
                     

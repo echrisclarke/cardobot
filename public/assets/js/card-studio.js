@@ -295,10 +295,14 @@
         titleText = titleText.toUpperCase();
         valueText = valueText.toUpperCase();
       }
+      // Avoid " +1 SPD  +1 SPD " when name and line are the same token.
+      if (titleText && valueText && titleText === valueText) {
+        valueText = '';
+      }
       el.textContent = '';
       el.style.display = 'flex';
       el.style.justifyContent = 'space-between';
-      el.style.alignItems = 'center';
+      el.style.alignItems = box.valign === 'start' ? 'flex-start' : 'center';
       el.style.gap = '0.35em';
       el.style.whiteSpace = 'nowrap';
       el.style.overflow = 'hidden';
@@ -391,7 +395,17 @@
       }
       const meta = this._metaLines(this.concept, this.stats);
       this._applyConceptStyle(this.concept);
-      const nickFs = this._fitText(this.nickEl, nick);
+      // Non-Latin falls back off Press Start; bump optical size so title weight matches Latin.
+      let nickFs;
+      if (this.nickEl && /[^\u0000-\u024F]/.test(nick)) {
+        const box = this.nickEl._box || {};
+        const orig = box.fontSize;
+        box.fontSize = Math.round((orig || 22) * 1.15);
+        nickFs = this._fitText(this.nickEl, nick);
+        box.fontSize = orig;
+      } else {
+        nickFs = this._fitText(this.nickEl, nick);
+      }
       if (this.creditEl) this._fitText(this.creditEl, meta.credit);
       this.setShowCredit(this.showCredit);
       if (this.typeEl) this._fitText(this.typeEl, meta.type);

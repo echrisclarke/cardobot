@@ -186,6 +186,15 @@ function save_finished_card(int $userId, string $sessionId, array $opts): array 
     if (!empty($stats)) {
         $attrs['stats'] = $stats;
     }
+    $locale = '';
+    if (!empty($opts['locale']) && is_string($opts['locale'])) {
+        $locale = trim($opts['locale']);
+    } elseif (!empty($_SESSION['cardobot_locale'])) {
+        $locale = trim((string)$_SESSION['cardobot_locale']);
+    }
+    if ($locale !== '') {
+        $attrs['locale'] = $locale;
+    }
 
     try {
         $stmt = $pdo->prepare("
@@ -236,6 +245,15 @@ function save_finished_card(int $userId, string $sessionId, array $opts): array 
             $light,
             json_encode($attrs),
         ]);
+
+        // Best-effort dedicated locale column when migration has run.
+        if ($locale !== '') {
+            try {
+                $pdo->prepare('UPDATE cardobot_cards SET locale = ? WHERE card_id = ?')->execute([$locale, $sessionId]);
+            } catch (Throwable $e) {
+                // column may not exist yet
+            }
+        }
 
         return ['success' => true, 'card_id' => $sessionId, 'message' => 'Saved'];
     } catch (PDOException $e) {

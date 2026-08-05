@@ -5,7 +5,7 @@
   <title>Card layout smoke test</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Noto+Sans+SC:wght@400;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="../../assets/css/studio.css">
   <style>
     body { font-family: system-ui, sans-serif; background: #222; color: #eee; padding: 1rem; }
@@ -154,7 +154,23 @@
 
       const nickFs = Number(studio.nickEl.dataset.fitSize || 0);
       const hpFs = Number(studio.hpEl.dataset.fitSize || 0);
+      const bioFs = Number(studio.bioEl.dataset.fitSize || 0);
+      const powerFs = Number(studio.powerEl.dataset.fitSize || 0);
+      const statFs = Number((studio.statEls.npo && studio.statEls.npo.dataset.fitSize) || 0);
       if (nickFs && hpFs && hpFs > nickFs) fails.push('hp bigger than name (' + hpFs + '>' + nickFs + ')');
+      if (nickFs && statFs && !(nickFs > statFs)) fails.push('name not larger than stats (' + nickFs + '<=' + statFs + ')');
+      if (statFs && bioFs && !(statFs > bioFs)) fails.push('stats not larger than bio (' + statFs + '<=' + bioFs + ')');
+      if (bioFs && powerFs && Math.abs(bioFs - powerFs) > 3) {
+        fails.push('bio/power size drift (' + bioFs + ' vs ' + powerFs + ')');
+      }
+      // Ability should not duplicate the same token twice.
+      if (studio.abilityEl) {
+        const spans = studio.abilityEl.querySelectorAll('span');
+        if (spans.length >= 2 && (spans[0].textContent || '') === (spans[1].textContent || '')
+          && (spans[0].textContent || '').trim() !== '') {
+          fails.push('ability value duplicated');
+        }
+      }
 
       const creditP = pct(studio.creditEl, studio.card);
       // Inside art well (art bottom ~0.718)
@@ -175,7 +191,8 @@
       });
 
       const bioP = pct(studio.bioEl, studio.card);
-      if (bioP.bottom > 0.852) fails.push('bio into power panel (' + bioP.bottom.toFixed(3) + ')');
+      // Keep clear of printed INFERENCE POWER header band.
+      if (bioP.bottom > 0.845) fails.push('bio into power panel (' + bioP.bottom.toFixed(3) + ')');
 
       const powP = pct(studio.powerEl, studio.card);
       const abP = pct(studio.abilityEl, studio.card);
@@ -183,12 +200,13 @@
       if (Math.abs(powP.left - abP.left) > 0.004) {
         fails.push('power/ability left mismatch (' + powP.left.toFixed(3) + ' vs ' + abP.left.toFixed(3) + ')');
       }
+      // Value column starts after printed left labels (must not cover them).
       if (powP.left < 0.40 || powP.left > 0.46) fails.push('power left off value column (' + powP.left.toFixed(3) + ')');
       if (powP.right < 0.88) fails.push('power well too short on right (' + powP.right.toFixed(3) + ')');
       if (abP.right < 0.88) fails.push('ability well too short on right (' + abP.right.toFixed(3) + ')');
-      if (powP.top < 0.855 || powP.top > 0.885) fails.push('power top off labels (' + powP.top.toFixed(3) + ')');
-      if (abP.top < 0.880 || abP.top > 0.915) fails.push('ability top off labels (' + abP.top.toFixed(3) + ')');
-      if ((abP.top - powP.top) < 0.020 || (abP.top - powP.top) > 0.040) {
+      if (powP.top < 0.855 || powP.top > 0.890) fails.push('power top off labels (' + powP.top.toFixed(3) + ')');
+      if (abP.top < 0.880 || abP.top > 0.920) fails.push('ability top off labels (' + abP.top.toFixed(3) + ')');
+      if ((abP.top - powP.top) < 0.018 || (abP.top - powP.top) > 0.042) {
         fails.push('power/ability row pitch off (' + (abP.top - powP.top).toFixed(3) + ')');
       }
       if (abP.top <= powP.top) fails.push('ability not below power');
@@ -199,7 +217,7 @@
         fails.push('rule power missing bio note');
       }
 
-      return { name, fails, studio, nickP, powP, abP, creditP, nickFs, hpFs };
+      return { name, fails, studio, nickP, powP, abP, creditP, nickFs, hpFs, bioFs, powerFs, statFs };
     }
 
     (async function main() {
@@ -269,6 +287,20 @@
         bio: 'Built from salvaged bay doors and a foglamp, it polishes one surface while the rest rusts in salt air.',
         creator_username: 'echrisclarke',
       }, { hp: 60, npo: 46, att: 58, str: 22, los: 49, con: 59, height: '2.1 m', mass: '180 kg' }));
+      results.push(await runCase('cjk-xiaoka', {
+        ...base,
+        nickname: '小卡',
+        type: 'Bot',
+        power_name: 'PIPSPARK',
+        power_mode: 'stat',
+        power_value: '',
+        ability_name: '+1 SPD',
+        ability_line: '+1 SPD',
+        name_ink: 'teal',
+        stats_ink: 'mint',
+        card_bg: 'dock_teal',
+        bio: '小卡 is a compact maintenance bot with a toolkit and a calm stare.',
+      }, { hp: 24, npo: 55, att: 45, str: 38, los: 52, con: 61, height: '0.6 m', mass: '12 kg' }));
 
       const lines = [];
       let failed = 0;
@@ -279,6 +311,7 @@
         } else {
           lines.push('PASS ' + r.name
             + ' | nickFs=' + r.nickFs + ' hpFs=' + r.hpFs
+            + ' bioFs=' + r.bioFs + ' statFs=' + r.statFs
             + ' powTop=' + r.powP.top.toFixed(3)
             + ' creditB=' + r.creditP.bottom.toFixed(3));
         }

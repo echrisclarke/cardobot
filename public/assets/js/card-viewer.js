@@ -50,7 +50,6 @@
               <div class="cob-face cob-face-back" data-back>
                 <div class="cob-back-tint" data-back-tint></div>
                 <img class="cob-back-art" data-back-art alt="Card back">
-                <div class="cob-back-plate"><strong data-back-name></strong><span data-back-type></span></div>
               </div>
             </div>
           </div>
@@ -250,16 +249,6 @@
       if (backs.length) {
         this.backArt.src = this.assetBase + '/assets/img/cardbacks/' + backs[this.backVariant % backs.length];
       }
-      let backName = String(this.concept.nickname || this.concept.subject || 'Card').trim();
-      const nickCap = (global.CardobotLayout && global.CardobotLayout.LIMITS
-        && global.CardobotLayout.LIMITS.nickname) || 16;
-      if (backName.length > nickCap) {
-        const cut = backName.slice(0, nickCap);
-        const sp = cut.lastIndexOf(' ');
-        backName = (sp >= 4 ? cut.slice(0, sp) : cut).trim();
-      }
-      this.el.querySelector('[data-back-name]').textContent = backName;
-      this.el.querySelector('[data-back-type]').textContent = (this.concept.type || 'BOT') + ' · Card-o-Bot';
       this._applyBackTint();
       this._applyTransform();
 

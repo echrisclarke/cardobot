@@ -18,7 +18,8 @@
   const CardLayout = {
     CARD_W,
     CARD_H,
-    FACE_FONT: '"Press Start 2P", "Courier New", monospace',
+    // Press Start first; CJK/other scripts fall through to Noto / system.
+    FACE_FONT: '"Press Start 2P", "Noto Sans SC", "Noto Sans JP", "Noto Sans", "Segoe UI", sans-serif',
     // Hard display caps for Press Start 2P (AI aims match; face shrinks, never ellipsis).
     LIMITS: {
       nickname: 16,
@@ -61,10 +62,11 @@
       return { x, y, w, h };
     })(),
     // Sizes are px at CARD_W (606). Display scales from card width in studio.
+    // Target Press Start hierarchy: nick ≥ HP > stats > bio ≈ power > meta.
     NICKNAME: {
-      x: sx(36), y: sy(28), w: sx(230), h: sy(20),
-      fontSize: 16, fontWeight: '400', color: 'rgba(88,88,88,1)',
-      align: 'left', maxLines: 1, lineHeight: 1, minFontSize: 10,
+      x: sx(36), y: sy(26), w: sx(230), h: sy(26),
+      fontSize: 22, fontWeight: '400', color: 'rgba(88,88,88,1)',
+      align: 'left', maxLines: 1, lineHeight: 1, minFontSize: 11,
     },
     CREDIT: {
       x: sx(130), y: sy(338), w: sx(190), h: sy(14),
@@ -88,33 +90,33 @@
       align: 'right', maxLines: 1, lineHeight: 1, minFontSize: 7,
     },
     BIO: {
-      x: sx(72), y: sy(376), w: sx(248), h: sy(46),
-      fontSize: 9, fontWeight: '400', color: 'rgba(44,127,162,1)',
+      x: sx(72), y: sy(374), w: sx(248), h: sy(42),
+      fontSize: 11, fontWeight: '400', color: 'rgba(44,127,162,1)',
       align: 'left', maxLines: 5, lineHeight: 1.35, minFontSize: 7,
     },
     POWER: {
-      x: sx(148), y: sy(433), w: sx(176), h: sy(13),
-      fontSize: 9, fontWeight: '400', color: 'rgba(218,239,237,0.95)',
-      align: 'left', maxLines: 1, transform: 'uppercase', valign: 'center',
+      x: sx(148), y: sy(434), w: sx(176), h: sy(15),
+      fontSize: 11, fontWeight: '400', color: 'rgba(218,239,237,0.95)',
+      align: 'left', maxLines: 1, transform: 'uppercase', valign: 'start',
       lineHeight: 1, minFontSize: 7,
     },
     ABILITY: {
-      x: sx(148), y: sy(447), w: sx(176), h: sy(13),
-      fontSize: 9, fontWeight: '400', color: 'rgba(249,187,170,0.95)',
-      align: 'left', maxLines: 1, transform: 'uppercase', valign: 'center',
+      x: sx(148), y: sy(448), w: sx(176), h: sy(15),
+      fontSize: 11, fontWeight: '400', color: 'rgba(249,187,170,0.95)',
+      align: 'left', maxLines: 1, transform: 'uppercase', valign: 'start',
       lineHeight: 1, minFontSize: 7,
     },
     HP: {
-      x: sx(288), y: sy(38), w: sx(44), h: sy(18),
-      fontSize: 16, fontWeight: '400', color: 'rgba(224,126,140,0.95)',
-      align: 'center', maxLines: 1, lineHeight: 1, minFontSize: 10,
+      x: sx(288), y: sy(36), w: sx(44), h: sy(22),
+      fontSize: 20, fontWeight: '400', color: 'rgba(224,126,140,0.95)',
+      align: 'center', maxLines: 1, lineHeight: 1, minFontSize: 11,
     },
     STATS: [
-      { key: 'npo', label: 'NPO', x: sx(40), y: sy(64), w: sx(48), h: sy(18), fontSize: 13, align: 'left' },
-      { key: 'att', label: 'ATT', x: sx(40), y: sy(122), w: sx(48), h: sy(18), fontSize: 13, align: 'left' },
-      { key: 'str', label: 'STR', x: sx(40), y: sy(180), w: sx(48), h: sy(18), fontSize: 13, align: 'left' },
-      { key: 'los', label: 'LOS', x: sx(40), y: sy(238), w: sx(48), h: sy(18), fontSize: 13, align: 'left' },
-      { key: 'con', label: 'CON', x: sx(40), y: sy(296), w: sx(48), h: sy(18), fontSize: 13, align: 'left' },
+      { key: 'npo', label: 'NPO', x: sx(40), y: sy(64), w: sx(48), h: sy(18), fontSize: 14, align: 'left' },
+      { key: 'att', label: 'ATT', x: sx(40), y: sy(122), w: sx(48), h: sy(18), fontSize: 14, align: 'left' },
+      { key: 'str', label: 'STR', x: sx(40), y: sy(180), w: sx(48), h: sy(18), fontSize: 14, align: 'left' },
+      { key: 'los', label: 'LOS', x: sx(40), y: sy(238), w: sx(48), h: sy(18), fontSize: 14, align: 'left' },
+      { key: 'con', label: 'CON', x: sx(40), y: sy(296), w: sx(48), h: sy(18), fontSize: 14, align: 'left' },
     ],
     STAT_COLOR: 'rgba(255,255,255,0.95)',
     BACKS: [

@@ -561,6 +561,14 @@ function cardy_build_input(
     $state['step'] = $step;
     $parts = [];
     $parts[] = cardy_system_prompt();
+    if (!empty($state['locale']) && is_string($state['locale']) && $state['locale'] !== 'en') {
+        require_once __DIR__ . '/i18n.php';
+        $langName = i18n_locale_display_name($state['locale']);
+        $parts[] = "LANGUAGE LOCK: Reply ONLY in {$langName} ({$state['locale']}). "
+            . "All chat lines, suggestion chips, and card face fields you invent "
+            . "(nickname, bio, power_name, ability_name, ability_line, details vibe copy) must be in that language. "
+            . "Keep console sound cues like *beep* as-is.";
+    }
     $parts[] = cardy_agenda_instruction($state, $username, $memoryHints, $loreBlock);
 
     if (!empty($recentHistory)) {
