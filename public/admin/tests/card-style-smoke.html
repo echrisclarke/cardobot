@@ -3,6 +3,9 @@
 <head>
   <meta charset="utf-8">
   <title>Card style smoke</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="../../assets/css/studio.css">
   <style>
     body { font-family: system-ui, sans-serif; background: #1c1c1c; color: #eee; padding: 1rem; }
@@ -55,14 +58,20 @@
         bgUrl: assetBase + '/assets/img/01_CardBGtexture.png',
         hideTools: true,
       });
-      studio.setConcept(entry.concept, entry.stats || {});
+      if (document.fonts && document.fonts.load) {
+        try {
+          await document.fonts.load('12px "Press Start 2P"');
+          await document.fonts.ready;
+        } catch (e) { /* continue */ }
+      }
+      await studio.setConcept(entry.concept, entry.stats || {});
       if (entry.art && !/^https?:/i.test(entry.art)) {
         await studio.setArt('smoke-out/styles/' + (entry.art_dir || entry.style_key) + '/' + entry.art);
       } else if (entry.art) {
         await studio.setArt(entry.art);
       }
       await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
-      await new Promise((r) => setTimeout(r, 60));
+      await new Promise((r) => setTimeout(r, 80));
 
       const fails = [];
       if (!entry.ok_art) fails.push('art missing');

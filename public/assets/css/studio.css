@@ -1,4 +1,5 @@
 /* Finish Card studio + hybrid reveal actions */
+@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
 
 .wizard-studio-panel {
   display: none;
@@ -70,6 +71,9 @@
   width: 100%;
   height: 100%;
   object-fit: cover;
+  /* Crop residual AI paper margins so paint hits the printed well. */
+  transform: scale(1.08);
+  transform-origin: center center;
   pointer-events: none;
 }
 
@@ -89,7 +93,8 @@
   z-index: 5;
   pointer-events: none;
   color: #1a1a1a;
-  font-family: "Roboto", "Open Sans", "Segoe UI", sans-serif;
+  /* Must match live Card-o-Bot face: Press Start 2P is wide; layout caps assume it. */
+  font-family: var(--font-family-retro, "Press Start 2P", "Courier New", monospace);
   padding: 0;
 }
 

@@ -127,8 +127,12 @@ Who goes on the card:
 - Ask in small steps. First: what KIND of being (bot / android / human / critter / etc). Then who they are. Then look.
 - Never dump a long prewritten OC into a chip. Chips stay SHORT (a few words, max ~24 characters).
 - Kind turn chips: short labels like "A bot", "An android", "A human", "A critter" (up to 4). They can type something else.
-- After kind is known: offer CARD NAME chips (callsigns) that MATCH that kind (e.g. for a bot: "Bolt Hum", "Dock Rust", "Cargo Pip"). Invent fresh each time. 1-3 words, max 22 chars. Never long clauses.
-- Nickname rules: a callsign or short title, 3-22 characters, never a full sentence. Prefer 1-3 words ("Dock", "Bolt Hum", "Map Fold"). Visitors may always type their own name instead of picking a chip.
+- After kind is known: invent 3 FRESH CARD NAME chips that fit THAT being. Never reuse stale house examples (no Bolt Hum / Dock Rust / Map Fold).
+  Names must feel owned: serials, owner nicknames, abbreviations, ship registry, human given names, or non-English scripts when it fits.
+  Examples of the KIND of variety (do not copy these): bot "Cambot" / "R-17" / "Pip"; android "Mira" / "单元-4" / "Juno-9";
+  human "阿明" / "Lea Voss" / "Sora"; critter "Mochi" / "Venti"; living ship "SS Arbiter" / "The Latch".
+  Max 16 characters. 1-3 words or a compact serial. Never a sentence. Visitors may always type their own.
+- Nickname rules: any script is fine (Latin, CJK, Cyrillic, etc.) when it suits the character. Mix styles across chips so all three are not the same pattern.
 - Later turns: 0-3 short chips that react to WHAT THEY SAID.
 - They can always type their own. Never invent a "Type your own response" chip.
 - Never steer toward furries or people-in-animal-costumes. Cute small ship critters are fine.
@@ -137,16 +141,16 @@ Authorship (critical):
 - Their choices win. Never overwrite subject, nickname, details, vibe, setting, stake, or type (kind) they already set.
 - Store kind in visual_concept.type (Bot / Android / Human / Critter / or their words). Classify kind from what they describe when clear.
 - After kind + identity + look are clear (or on the look turn once they answered), soft-fill:
-  nickname ONLY if still empty (short callsign, max 22);
-  power_name MAX 18 chars; ability_name MAX 16 (ability TITLE); ability_line MAX 12 (short EFFECT like "+2 STR" or "2T SAFE");
+  nickname ONLY if still empty (short callsign, max 16);
+  power_name MAX 12 chars; ability_name MAX 12 (ability TITLE); ability_line MAX 8 (short EFFECT like "+2 STR" or "2T SAFE");
   power_mode "stat" or "rule";
-  if stat: power_value like "+2 NPO" (MAX 10 chars; do NOT explain that bump in the bio);
-  if rule: power_value "RULE"/"2T" (MAX 10) and power_rule_hint for the bio only when the effect is a special rule
+  if stat: power_value like "+2 NPO" (MAX 8 chars; do NOT explain that bump in the bio);
+  if rule: power_value "RULE"/"2T" (MAX 8) and power_rule_hint for the bio only when the effect is a special rule
   (shield turns, cannot be targeted, new ship rule). Never put simple +stat / +HP lines into the bio.
   Kind is Bot / Android / Human / Critter only. An intelligent spaceship character is type Bot (never type Ship).
   Do not invent ocean boats unless they clearly asked for a water-planet boat bot.
   height/mass with physics; units ONLY abbreviated (m, cm, kg, t). Never write meters/tonnes/kilograms.
-  Examples: "1.8 m", "68 kg", "400 m", "150000 t". name_ink/stats_ink/card_bg from brand keys; bio (aim ~120-180, max 220).
+  Examples: "1.8 m", "68 kg", "400 m", "150000 t". name_ink/stats_ink/card_bg from brand keys; bio (aim ~70-90, max 100). Press Start 2P is wide.
 - Bio: mostly about THEM. Sometimes (not always) drop one subtle ship/memory hint. Never a lore dump.
   Only mention inference power / special ability in the bio when they create a special rule effect.
 
@@ -516,8 +520,8 @@ function cardy_agenda_instruction(array $state, string $username = '', array $me
     $kindBit = $kind !== '' ? " Kind already chosen: {$kind}." : '';
     $focusHints = [
         'kind' => 'They have not chosen a KIND yet (ignore menu lines). ONE short in-world ask: bot, android, human, critter, or something else aboard this ship. Suggestions: exactly these four short chips: "A bot", "An android", "A human", "A critter". Leave subject/nickname empty. Put their answer in visual_concept.type only.',
-        'identity' => "Kind is set.{$kindBit} ONE short ask for their CARD NAME (callsign). Invent up to 3 SHORT name chips (1-3 words, <=22 chars) that match that kind, flavored by \"{$spark}\". Fresh each time. They may type their own name instead. Put a picked/typed name in visual_concept.nickname; if they gave a role phrase, also put it in subject. Leave nickname empty until they pick or type.",
-        'look' => 'Mirror who THEY chose. Ask one visual detail in ship-plain words. 2-3 SHORT chips (<=24 chars). Soft-fill nickname ONLY if still empty (max 22). Soft-fill power_name (MAX 18), ability_name (MAX 16 title), ability_line (MAX 12 effect), power_mode stat|rule + power_value (MAX 10), height/mass with abbreviated units only (m/cm/kg/t, never meters/tonnes), name_ink/stats_ink/card_bg brand keys, bio (~120-180; optional ship hint). If they described an intelligent spaceship, type stays Bot. Bio explains power/ability ONLY for special rule effects, never for plain +stat/+HP bumps.',
+        'identity' => "Kind is set.{$kindBit} ONE short ask for their CARD NAME (callsign). Invent 3 DIFFERENT name chips (<=16 chars) that fit this kind and \"{$spark}\": vary the pattern (e.g. one abbrev/pet name, one serial/registry, one personal or non-English name when it fits). Never Bolt Hum / Dock Rust / Map Fold. Fresh every time. They may type their own. Put a picked/typed name in visual_concept.nickname; if they gave a role phrase, also put it in subject. Leave nickname empty until they pick or type.",
+        'look' => 'Mirror who THEY chose. Ask one visual detail in ship-plain words. 2-3 SHORT chips (<=24 chars). Soft-fill nickname ONLY if still empty (max 16; invent a fitting callsign, not a generic two-word dock pun). Soft-fill power_name (MAX 12), ability_name (MAX 12 title), ability_line (MAX 8 effect), power_mode stat|rule + power_value (MAX 8), height/mass with abbreviated units only (m/cm/kg/t, never meters/tonnes), name_ink/stats_ink/card_bg brand keys, bio (~70-90, max 100; optional ship hint). If they described an intelligent spaceship, type stays Bot. Bio explains power/ability ONLY for special rule effects, never for plain +stat/+HP bumps.',
         'stake' => 'Mirror who. Ask what matters about them. One ask. 2-3 SHORT chips (<=24 chars).',
         'place' => 'Mirror them. Ask where we see them on the card. One ask. 2-3 SHORT chips (<=24 chars).',
     ];
@@ -686,7 +690,43 @@ function cardy_shorten_chip(string $chip, int $max = 24): string {
 }
 
 /**
- * Alternate callsign chips for confirm (fast + long). Visitor can still type their own.
+ * Build a short abbrev / pet name from a role phrase (Camera Bot → Cambot).
+ */
+function cardy_abbrev_from_subject(string $subject): string {
+    $subject = trim(preg_replace('/\s+/u', ' ', $subject) ?? $subject);
+    if ($subject === '') {
+        return '';
+    }
+    $clean = preg_replace('/[^\p{L}\p{N}\s\-]/u', '', $subject) ?? $subject;
+    $words = preg_split('/\s+/u', $clean, -1, PREG_SPLIT_NO_EMPTY) ?: [];
+    if (count($words) === 0) {
+        return '';
+    }
+    $stop = ['a', 'an', 'the', 'of', 'and', 'with', 'from', 'little', 'small', 'big'];
+    $words = array_values(array_filter($words, static function ($w) use ($stop) {
+        return !in_array(mb_strtolower($w), $stop, true);
+    }));
+    if (count($words) === 0) {
+        return '';
+    }
+    if (count($words) === 1) {
+        $one = $words[0];
+        return mb_strlen($one) <= 16 ? $one : mb_substr($one, 0, 16);
+    }
+    // Camera Bot → Cambot; Dockyard Crane → Dockcrane
+    $first = $words[0];
+    $second = $words[1];
+    $blend = mb_substr($first, 0, min(3, mb_strlen($first))) . mb_strtolower(mb_substr($second, 0, min(4, mb_strlen($second))));
+    $blend = preg_replace('/[^\\p{L}\\p{N}\\-]/u', '', $blend) ?? $blend;
+    if (mb_strlen($blend) >= 3 && mb_strlen($blend) <= 16) {
+        return mb_strtoupper(mb_substr($blend, 0, 1)) . mb_substr($blend, 1);
+    }
+    $joined = implode('', array_map(static fn($w) => mb_substr($w, 0, 1), array_slice($words, 0, 4)));
+    return mb_strlen($joined) >= 2 ? mb_strtoupper($joined) : mb_substr($first, 0, 16);
+}
+
+/**
+ * Alternate callsign chips for confirm + identity fallback. Visitor can still type their own.
  *
  * @return list<string>
  */
@@ -694,47 +734,160 @@ function cardy_nickname_suggestions(array $concept): array {
     $kind = strtolower(trim((string)($concept['type'] ?? 'bot')));
     $nick = trim((string)($concept['nickname'] ?? ''));
     $subject = trim((string)($concept['subject'] ?? ''));
-    $seed = strtolower($nick . '|' . $subject . '|' . $kind);
-    if ($seed === '||' || $seed === '|') {
-        $seed = 'cardy';
+    $details = trim((string)($concept['details'] ?? ''));
+    $blob = strtolower($kind . ' ' . $subject . ' ' . $details);
+    $seed = $nick . '|' . $subject . '|' . $kind . '|' . $details;
+    if (trim($seed, '|') === '') {
+        $seed = 'cardy|' . (string)time();
     }
     $h = unpack('N', substr(hash('sha256', $seed, true), 0, 4));
     $n = (int)($h[1] ?? 1);
+    $serial = (string)(10 + ($n % 90));
+    $serialB = (string)(100 + (($n >> 3) % 900));
+
+    $isShip = (bool)preg_match('/\b(ship|spaceship|starship|freighter|vessel|cruiser|hauler|hull|ark)\b/u', $blob);
+    $wantsCjk = (bool)preg_match('/\b(chinese|china|mandarin|cantonese|japan|japanese|korean|cjk|漢字|中文|日本語|한국어)\b/ui', $blob)
+        || (bool)preg_match('/\p{Han}/u', $subject . $details . $nick);
 
     $pools = [
-        'bot' => ['Bolt Hum', 'Dock Pip', 'Cargo Bit', 'Night Cog', 'Rust Wren'],
-        'android' => ['Valve', 'Quiet Arc', 'Hull Glow', 'Soft Clamp', 'Wire Tea'],
-        'human' => ['Map Fold', 'Tea Chart', 'Galley Ash', 'Comet Ink', 'Dock Key'],
-        'critter' => ['Venti', 'Warm Vent', 'Spark Mite', 'Coil Nest', 'Puff Bit'],
+        'bot' => ['Pip', 'Rivet', 'Cam', 'Gasket', 'Tink', 'Nudge', 'Hex', 'Clack'],
+        'android' => ['Mira', 'Juno', 'Evan', 'Sable', 'Ilya', 'Noor', 'Kai', 'Remy'],
+        'human' => ['Lea', 'Sora', 'Mika', 'Jules', 'Asha', 'Ren', 'Tova', 'Nico'],
+        'critter' => ['Mochi', 'Pip', 'Bean', 'Venti', 'Nib', 'Puff', 'Zest', 'Miso'],
     ];
-    $pool = $pools[$kind] ?? array_merge($pools['bot'], $pools['critter']);
+    $cjkPools = [
+        'bot' => ['小钉', '火花', '舱灯', '铆钉'],
+        'android' => ['阿明', '林七', '单元', '晓'],
+        'human' => ['阿明', '小雨', '林夏', '浩'],
+        'critter' => ['团子', '豆豆', '咪咪', '球球'],
+    ];
+    $shipPool = ['SS Latch', 'The Arbiter', 'SS Ember', 'Hull Nine', 'The Kiln', 'SS Mora'];
+    $kindKey = array_key_exists($kind, $pools) ? $kind : 'bot';
+    $pool = $pools[$kindKey];
+    $cjk = $cjkPools[$kindKey] ?? $cjkPools['bot'];
 
     $candidates = [];
-    if ($nick !== '' && mb_strlen($nick) <= 22) {
+    if ($nick !== '' && mb_strlen($nick) <= 16) {
         $candidates[] = $nick;
     }
-    if ($subject !== '' && strcasecmp($subject, $nick) !== 0) {
-        $words = preg_split('/\s+/u', $subject, -1, PREG_SPLIT_NO_EMPTY);
-        if (is_array($words) && count($words) > 0 && count($words) <= 3) {
-            $fromSubject = implode(' ', $words);
-            if (mb_strlen($fromSubject) <= 18) {
-                $candidates[] = $fromSubject;
-            }
+
+    // Cultural / script cue first so Chinese bots get Chinese chips, not Latin abbrevs only.
+    if ($wantsCjk) {
+        $base = $cjk[$n % count($cjk)];
+        $candidates[] = $base;
+        $candidates[] = $base . '-' . $serial;
+        if ($kind === 'android' || $kind === 'bot') {
+            $candidates[] = '单元-' . $serial;
         }
     }
+
+    $abbrevSrc = $subject !== '' ? $subject : $details;
+    $abbrev = cardy_abbrev_from_subject($abbrevSrc);
+    if ($abbrev !== '' && strcasecmp($abbrev, $nick) !== 0) {
+        $candidates[] = $abbrev;
+    }
+    // Owner-style pet split when the role ends in bot/droid: Camera Bot → Cam Bott
+    $roleWords = preg_split('/\s+/u', trim($abbrevSrc), -1, PREG_SPLIT_NO_EMPTY) ?: [];
+    if (count($roleWords) >= 2 && preg_match('/^(bot|droid|pup|cat|dog|ship)$/iu', $roleWords[count($roleWords) - 1])) {
+        $rawHead = mb_substr($roleWords[0], 0, 3);
+        $head = mb_strtoupper(mb_substr($rawHead, 0, 1)) . mb_strtolower(mb_substr($rawHead, 1));
+        $tail = $roleWords[count($roleWords) - 1];
+        $pet = $head . ' ' . mb_strtoupper(mb_substr($tail, 0, 1)) . mb_strtolower(mb_substr($tail, 1, 3));
+        if (mb_strlen($pet) <= 16) {
+            $candidates[] = $pet;
+        }
+    }
+
+    if ($isShip) {
+        $candidates[] = $shipPool[$n % count($shipPool)];
+        $candidates[] = 'SS-' . $serialB;
+        $candidates[] = $shipPool[($n + 2) % count($shipPool)];
+    } elseif ($kind === 'android' || $kind === 'bot') {
+        $letter = chr(65 + ($n % 26));
+        $candidates[] = $letter . '-' . $serial;
+        $candidates[] = 'UNIT-' . $serial;
+    }
+
+    // Occasional non-English chip even without an explicit cue.
+    if (!$wantsCjk && ($n % 7) === 0) {
+        $base = $cjk[($n + 1) % count($cjk)];
+        $candidates[] = $base;
+    }
+
     $candidates[] = $pool[$n % count($pool)];
-    $candidates[] = $pool[($n + 2) % count($pool)];
-    $candidates[] = $pool[($n + 4) % count($pool)];
+    $candidates[] = $pool[($n + 3) % count($pool)];
+    if ($kind === 'human' || $kind === 'android') {
+        $candidates[] = $pool[($n + 5) % count($pool)] . '-' . $serial;
+    }
 
     $out = [];
     foreach ($candidates as $name) {
         $name = trim((string)preg_replace('/\s+/u', ' ', (string)$name));
-        if ($name === '' || mb_strlen($name) > 22) {
+        if ($name === '' || mb_strlen($name) > 16) {
+            continue;
+        }
+        // Ban the old generic dock-pun house names.
+        if (preg_match('/^(bolt hum|dock rust|map fold|dock pip|cargo bit|cargo pip|night cog|rust wren)$/iu', $name)) {
             continue;
         }
         $dup = false;
         foreach ($out as $existing) {
-            if (strcasecmp($existing, $name) === 0) {
+            if (mb_strtolower($existing) === mb_strtolower($name)) {
+                $dup = true;
+                break;
+            }
+        }
+        if (!$dup) {
+            $out[] = $name;
+        }
+        if (count($out) >= 3) {
+            break;
+        }
+    }
+    return $out;
+}
+
+/**
+ * Filter AI name chips: drop banned generics, keep unicode callsigns, pad from generator.
+ *
+ * @param list<mixed> $suggestions
+ * @return list<string>
+ */
+function cardy_sanitize_name_suggestions(array $suggestions, array $concept): array {
+    $banned = '/^(bolt hum|dock rust|map fold|dock pip|cargo bit|cargo pip|night cog|rust wren|warm solder)$/iu';
+    $out = [];
+    foreach ($suggestions as $name) {
+        if (!is_string($name)) {
+            continue;
+        }
+        $name = trim(preg_replace('/\s+/u', ' ', $name) ?? $name);
+        if ($name === '' || mb_strlen($name) > 16) {
+            continue;
+        }
+        if (preg_match($banned, $name)) {
+            continue;
+        }
+        if (!preg_match('/^[\p{L}\p{N}][\p{L}\p{N}\'\.\- ]{0,15}$/u', $name)) {
+            continue;
+        }
+        $dup = false;
+        foreach ($out as $existing) {
+            if (mb_strtolower($existing) === mb_strtolower($name)) {
+                $dup = true;
+                break;
+            }
+        }
+        if (!$dup) {
+            $out[] = $name;
+        }
+        if (count($out) >= 3) {
+            return $out;
+        }
+    }
+    foreach (cardy_nickname_suggestions($concept) as $name) {
+        $dup = false;
+        foreach ($out as $existing) {
+            if (mb_strtolower($existing) === mb_strtolower($name)) {
                 $dup = true;
                 break;
             }
@@ -752,7 +905,7 @@ function cardy_nickname_suggestions(array $concept): array {
 /** True when free text looks like a card-name rewrite (not a paint/look tweak). */
 function cardy_looks_like_nickname(string $text): bool {
     $text = trim($text);
-    if ($text === '' || mb_strlen($text) > 22) {
+    if ($text === '' || mb_strlen($text) > 16) {
         return false;
     }
     $low = strtolower($text);

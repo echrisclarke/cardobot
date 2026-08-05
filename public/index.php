@@ -837,7 +837,7 @@ body.chat-page .chat-messages.show-cardy-bg {
             } else if (!Object.prototype.hasOwnProperty.call(concept, 'show_credit')) {
                 concept.show_credit = true;
             }
-            s.setConcept(concept, lastStats || {});
+            await s.setConcept(concept, lastStats || {});
             if (lastArtUrl && !studioOverride) await s.setArt(lastArtUrl);
             let png;
             try {

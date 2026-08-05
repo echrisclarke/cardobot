@@ -10,15 +10,17 @@
 function cardobot_house_art_style(): string {
     return 'STYLE NAME: Card-o-Bot Gouache (mandatory house look on every card). '
         . 'Opaque gouache / poster paint on warm tooth paper, matte finish, soft vignette, '
-        . 'chunky brush tips with visible paint thickness and odd handmade quirkiness. '
-        . 'Imperfect on purpose: uneven coverage, slight wonky proportions, charming mistakes welcome; not polished, not perfect, not concept-art clean. '
+        . 'chunky brush tips with visible paint thickness and handmade quirkiness. '
+        . 'Keep the painted, collectible-card soul; add Card-o-Bot mischief: '
+        . 'occasional registration wobble (a color plate shifted a millimeter), a limb or antenna slightly wrong-sized, '
+        . 'one accidental drip or thumb smudge, paint that sneaks outside a line, a patch of underdrawing left showing. '
+        . 'Not every card is cute; when the subject is cute, allow a soft bot vibe, but never a default smile, '
+        . 'sparkle-eyed plush face, or generic stock-mascot robot. '
+        . 'Imperfect on purpose: uneven coverage, wonky proportions, charming artist mistakes; not polished concept-art clean. '
         . 'Full color freedom: any hues the scene needs; do not restrict to a fixed or limited palette. '
-        . 'Approachable and friendly without babyish mascot energy. '
-        . 'Expression and cuteness follow the character only; no default smiles or sparkle-eyed plush look. '
-        . 'LINEWORK: outlines shift color as they travel (picking up neighboring paint), not one flat ink color everywhere; '
-        . 'in places the contour breaks into visible graphite pencil; edges can feel slightly unfinished or open, '
-        . 'especially toward the outer margins. '
-        . 'Subtle Card-o-Bot tells: light paper grain, hand wobble, thin teal or copper rim on some silhouette edges. '
+        . 'LINEWORK: outlines shift color as they travel (picking up neighboring paint), not one flat ink color; '
+        . 'contours may break into graphite pencil in places. '
+        . 'Subtle Card-o-Bot tells: light paper grain through the paint, hand wobble, thin teal or copper rim on some silhouettes. '
         . 'No photorealism, no glossy 3D render, no cinematic HDR, no lens blur.';
 }
 
@@ -90,7 +92,10 @@ function build_render_prompt(array $concept, array $memoryHints = []): string {
         $parts[] = 'Portray a boat-bot character on a water world if that is what they described';
     }
 
-    $parts[] = 'Strict 1:1 square image. Subject fills edge to edge with no letterboxing, borders, or empty margins';
+    $parts[] = 'Strict 1:1 square FULL-BLEED image. Paint every pixel to the crop edges: no white margins, '
+        . 'no letterboxing, no empty paper border, no vignette fade to blank. '
+        . 'Background and subject must reach all four corners. Unfinished linework is fine; bare empty margins are not. '
+        . 'Crop tight on the character so they occupy the well; do not float a small figure in empty space';
     $parts[] = 'CRITICAL: the image must contain absolutely no text of any kind. '
         . 'No titles, names, captions, labels, UI, logos, watermarks, letters, digits, or writing anywhere in the art. '
         . 'No card frame. Pure illustration only';

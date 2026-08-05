@@ -139,12 +139,14 @@
             // Right-aligned meta needs a hair of inset so units (t/kg) are not clipped.
             align === 'right' ? 'padding:0 0.2em 0 0' : 'padding:0',
           ];
+      const faceFont = (L().FACE_FONT) || '"Press Start 2P", "Courier New", monospace';
       el.style.cssText = [
         'position:absolute',
         'left:' + ((box.x / W) * 100).toFixed(2) + '%',
         'top:' + ((box.y / H) * 100).toFixed(2) + '%',
         box.w ? 'width:' + ((box.w / W) * 100).toFixed(2) + '%' : '',
         box.h ? 'height:' + ((box.h / H) * 100).toFixed(2) + '%' : '',
+        'font-family:' + faceFont,
         'font-size:calc(' + fs + ' / ' + W + ' * 100cqw)',
         'font-weight:' + (box.fontWeight || '400'),
         'color:' + (box.color || '#222'),
@@ -164,12 +166,21 @@
       return el;
     }
 
+    async _ensureFaceFont() {
+      const faceFont = (L().FACE_FONT) || '"Press Start 2P", "Courier New", monospace';
+      if (!document.fonts || !document.fonts.load) return;
+      try {
+        await document.fonts.load('12px ' + faceFont);
+        await document.fonts.ready;
+      } catch (e) { /* use fallback metrics */ }
+    }
+
     _fitText(el, text, capFs) {
       const box = el._box || {};
       const W = L().CARD_W;
       let base = box.fontSize || 14;
       if (capFs != null && capFs > 0) base = Math.min(base, capFs);
-      const minFs = 7;
+      const minFs = box.minFontSize != null ? box.minFontSize : 5;
       let fs = base;
       const multi = (box.maxLines || 1) > 1;
       let value = text == null ? '' : String(text);
@@ -193,7 +204,7 @@
         apply(fs);
       }
       // Last resort: trim at a word boundary (never leave "...").
-      // Prefer shortening the number so mass/height units (t, kg, m) stay visible.
+      // Keep Mass/Height labels intact; shorten numbers before chopping the label.
       if (overflows()) {
         apply(minFs);
         fs = minFs;
@@ -203,6 +214,13 @@
             const num = unitMatch[1];
             const unit = unitMatch[2];
             value = value.slice(0, unitMatch.index) + num.slice(0, -1) + ' ' + unit;
+            el.textContent = value;
+            continue;
+          }
+          // Drop Type:/H:/M: prefix before eating into the label letters.
+          const labeled = value.match(/^(type|height|mass|h|m)\s*:\s*(.+)$/i);
+          if (labeled && labeled[2].length > 0) {
+            value = labeled[2];
             el.textContent = value;
             continue;
           }
@@ -275,7 +293,7 @@
       }
 
       const base = box.fontSize || 14;
-      const minFs = 7;
+      const minFs = box.minFontSize != null ? box.minFontSize : 5;
       let fs = base;
       const apply = (size) => {
         el.style.fontSize = 'calc(' + size + ' / ' + W + ' * 100cqw)';
@@ -327,13 +345,14 @@
       this._applyHsl();
     }
 
-    setConcept(concept, stats) {
+    async setConcept(concept, stats) {
       this.concept = concept || {};
       if (stats) this.stats = Object.assign({}, this.stats, stats);
       if (Object.prototype.hasOwnProperty.call(this.concept, 'show_credit')) {
         this.showCredit = this.concept.show_credit !== false && this.concept.show_credit !== 0
           && this.concept.show_credit !== '0' && this.concept.show_credit !== 'false';
       }
+      await this._ensureFaceFont();
       const nick = this._clipField('nickname', this.concept.nickname || this.concept.subject || 'Unnamed');
       const bio = this._clipField('bio', this.concept.bio || this.concept.details || '');
       const power = this._clipField('power_name', this.concept.power_name || '');
@@ -437,11 +456,14 @@
       }
       height = this._abbrevMeasure(height, 'height');
       mass = this._abbrevMeasure(mass, 'mass');
-      if (!/^height:/i.test(height)) height = 'Height: ' + height;
-      if (!/^mass:/i.test(mass)) mass = 'Mass: ' + mass;
+      // Short labels: Press Start 2P cannot afford "Height: "/"Mass: " padding.
+      if (!/^h:/i.test(height) && !/^height:/i.test(height)) height = 'H: ' + height;
+      else height = height.replace(/^height:\s*/i, 'H: ');
+      if (!/^m:/i.test(mass) && !/^mass:/i.test(mass)) mass = 'M: ' + mass;
+      else mass = mass.replace(/^mass:\s*/i, 'M: ');
       return {
         credit: user,
-        type: 'Type:  ' + kind,
+        type: 'Type: ' + kind,
         height,
         mass,
       };
@@ -535,7 +557,18 @@
       } catch (e) { /* optional */ }
 
       if (this.artImage) {
-        ctx.drawImage(this.artImage, art.x * scale, art.y * scale, art.w * scale, art.h * scale);
+        // Match .studio-art CSS scale(1.08) so export crops paper margins the same way.
+        const bleed = 1.08;
+        const aw = art.w * scale * bleed;
+        const ah = art.h * scale * bleed;
+        const ax = art.x * scale - (aw - art.w * scale) / 2;
+        const ay = art.y * scale - (ah - art.h * scale) / 2;
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(art.x * scale, art.y * scale, art.w * scale, art.h * scale);
+        ctx.clip();
+        ctx.drawImage(this.artImage, ax, ay, aw, ah);
+        ctx.restore();
       }
 
       if (this.engine) {
@@ -551,7 +584,8 @@
       const drawBox = (box, text) => {
         if (!text || !box) return;
         ctx.fillStyle = box.color || '#222';
-        ctx.font = `${box.fontWeight || '400'} ${(box.fontSize || 14) * scale}px Georgia, serif`;
+        const faceFont = (layout.FACE_FONT) || '"Press Start 2P", "Courier New", monospace';
+        ctx.font = `${box.fontWeight || '400'} ${(box.fontSize || 14) * scale}px ${faceFont}`;
         const align = box.align === 'center' ? 'center' : (box.align === 'right' ? 'right' : 'left');
         ctx.textAlign = align;
         let x = box.x * scale;

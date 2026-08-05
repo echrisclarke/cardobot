@@ -1,7 +1,6 @@
 /**
  * Gold-standard Card-o-Bot face layout (357×500 → 606×800).
- * Name stays right of art left edge. Credit lives inside the art well.
- * Power/ability tops track printed INFERENCE POWER / SPECIAL ABILITY labels.
+ * Face type is Press Start 2P (wide pixel). Sizes/caps are tuned for that font.
  */
 (function (global) {
   'use strict';
@@ -19,14 +18,15 @@
   const CardLayout = {
     CARD_W,
     CARD_H,
-    // Hard display caps (AI aims match; face shrinks, never ellipsis).
+    FACE_FONT: '"Press Start 2P", "Courier New", monospace',
+    // Hard display caps for Press Start 2P (AI aims match; face shrinks, never ellipsis).
     LIMITS: {
-      nickname: 22,
-      power_name: 18,
-      ability_name: 16,
-      ability_line: 12,
-      power_value: 10,
-      bio: 220,
+      nickname: 16,
+      power_name: 12,
+      ability_name: 12,
+      ability_line: 8,
+      power_value: 8,
+      bio: 100,
     },
     NAME_INKS: {
       slate: 'rgba(88,88,88,1)',
@@ -52,75 +52,68 @@
       warm_cargo: { h: 28, s: 40, l: 40 },
       deep_cyan: { h: 188, s: 55, l: 34 },
     },
-    // Square art well; bottom stays above the printed "i" cutout (~y 575).
+    // Square art well; fill the printed window; bottom stays above the "i" (~y 575).
     ART: (() => {
-      const y = sy(56);
-      const side = Math.min(sy(300), 572 - y);
+      const y = sy(52);
+      const side = Math.min(sx(310), 570 - y);
       const x = Math.round((CARD_W - side) / 2);
       return { x, y, w: side, h: side };
     })(),
     NICKNAME: {
-      // Vertically centered in the light name well; width leaves room for HP tab
-      x: sx(36), y: sy(26), w: sx(230), h: sy(24),
-      fontSize: sy(22), fontWeight: '700', color: 'rgba(88,88,88,1)',
-      align: 'left', maxLines: 1,
+      x: sx(36), y: sy(28), w: sx(230), h: sy(20),
+      fontSize: 13, fontWeight: '400', color: 'rgba(88,88,88,1)',
+      align: 'left', maxLines: 1, lineHeight: 1, minFontSize: 7,
     },
-    // Inside art well, bottom-right; readable over any paint
     CREDIT: {
-      x: sx(130), y: sy(330), w: sx(190), h: sy(22),
-      fontSize: sy(14), fontWeight: '700', color: 'rgba(255,236,228,0.95)',
-      align: 'right', maxLines: 1,
+      x: sx(130), y: sy(330), w: sx(190), h: sy(16),
+      fontSize: 8, fontWeight: '400', color: 'rgba(255,236,228,0.95)',
+      align: 'right', maxLines: 1, lineHeight: 1,
       textShadow: '0 0 3px rgba(0,0,0,0.95), 0 1px 0 rgba(0,0,0,0.8), 0 -1px 0 rgba(0,0,0,0.55)',
     },
-    // Under-art strip: meta above printed dotted rule (~y 600); bio fills to power panel.
+    // Meta row: Press Start glyphs are ~1em wide; keep labels short and MASS widest.
     TYPE: {
-      x: sx(70), y: sy(354), w: sx(105), h: sy(12),
-      fontSize: sy(9), fontWeight: '400', color: 'rgba(88,88,88,1)',
-      align: 'left', maxLines: 1,
+      x: sx(68), y: sy(356), w: sx(88), h: sy(11),
+      fontSize: 6, fontWeight: '400', color: 'rgba(88,88,88,1)',
+      align: 'left', maxLines: 1, lineHeight: 1, minFontSize: 5,
     },
     HEIGHT: {
-      // Leave MASS a wide right well so "180000 t" keeps its unit.
-      x: sx(168), y: sy(354), w: sx(62), h: sy(12),
-      fontSize: sy(9), fontWeight: '400', color: 'rgba(88,88,88,1)',
-      align: 'right', maxLines: 1,
+      x: sx(158), y: sy(356), w: sx(78), h: sy(11),
+      fontSize: 6, fontWeight: '400', color: 'rgba(88,88,88,1)',
+      align: 'right', maxLines: 1, lineHeight: 1, minFontSize: 5,
     },
     MASS: {
-      x: sx(236), y: sy(354), w: sx(90), h: sy(12),
-      fontSize: sy(9), fontWeight: '400', color: 'rgba(88,88,88,1)',
-      align: 'right', maxLines: 1,
+      x: sx(238), y: sy(356), w: sx(90), h: sy(11),
+      fontSize: 6, fontWeight: '400', color: 'rgba(88,88,88,1)',
+      align: 'right', maxLines: 1, lineHeight: 1, minFontSize: 5,
     },
     BIO: {
-      // Inside printed bio well; keep clear of the right dotted vertical rule (~x 560).
-      x: sx(72), y: sy(379), w: sx(248), h: sy(42),
-      fontSize: sy(11), fontWeight: '400', color: 'rgba(44,127,162,1)',
-      align: 'left', maxLines: 4, lineHeight: 1.28,
+      x: sx(72), y: sy(378), w: sx(248), h: sy(44),
+      fontSize: 6, fontWeight: '400', color: 'rgba(44,127,162,1)',
+      align: 'left', maxLines: 5, lineHeight: 1.4, minFontSize: 5,
     },
-    // Dark panel ~y 425. White divider ~x 141–145.
-    // One full-width value column for both rows (power title+value share the power well).
     POWER: {
-      x: sx(150), y: sy(433), w: sx(172), h: sy(13),
-      fontSize: sy(11), fontWeight: '700', color: 'rgba(218,239,237,0.95)',
-      align: 'left', maxLines: 1, transform: 'uppercase', valign: 'center', lineHeight: 1,
+      x: sx(148), y: sy(433), w: sx(176), h: sy(13),
+      fontSize: 7, fontWeight: '400', color: 'rgba(218,239,237,0.95)',
+      align: 'left', maxLines: 1, transform: 'uppercase', valign: 'center',
+      lineHeight: 1, minFontSize: 5,
     },
     ABILITY: {
-      // One line only: shrink-to-fit, never wrap.
-      x: sx(150), y: sy(447), w: sx(172), h: sy(13),
-      fontSize: sy(11), fontWeight: '700', color: 'rgba(249,187,170,0.95)',
-      align: 'left', maxLines: 1, transform: 'uppercase', valign: 'center', lineHeight: 1,
+      x: sx(148), y: sy(447), w: sx(176), h: sy(13),
+      fontSize: 7, fontWeight: '400', color: 'rgba(249,187,170,0.95)',
+      align: 'left', maxLines: 1, transform: 'uppercase', valign: 'center',
+      lineHeight: 1, minFontSize: 5,
     },
     HP: {
-      // Digit cutout right of printed HP glyphs; wide enough for 3-digit values
-      x: sx(290), y: sy(37), w: sx(40), h: sy(20),
-      fontSize: sy(20), fontWeight: '700', color: 'rgba(224,126,140,0.95)',
-      align: 'center', maxLines: 1,
+      x: sx(288), y: sy(38), w: sx(44), h: sy(18),
+      fontSize: 14, fontWeight: '400', color: 'rgba(224,126,140,0.95)',
+      align: 'center', maxLines: 1, lineHeight: 1,
     },
-    // Left edge of digits lined up with left edge of printed NPO/ATT/… titles
     STATS: [
-      { key: 'npo', label: 'NPO', x: sx(40), y: sy(62), w: sx(40), h: sy(24), fontSize: sy(18), align: 'left' },
-      { key: 'att', label: 'ATT', x: sx(40), y: sy(120), w: sx(40), h: sy(24), fontSize: sy(18), align: 'left' },
-      { key: 'str', label: 'STR', x: sx(40), y: sy(178), w: sx(40), h: sy(24), fontSize: sy(18), align: 'left' },
-      { key: 'los', label: 'LOS', x: sx(40), y: sy(236), w: sx(40), h: sy(24), fontSize: sy(18), align: 'left' },
-      { key: 'con', label: 'CON', x: sx(40), y: sy(294), w: sx(40), h: sy(24), fontSize: sy(18), align: 'left' },
+      { key: 'npo', label: 'NPO', x: sx(40), y: sy(64), w: sx(48), h: sy(20), fontSize: 11, align: 'left' },
+      { key: 'att', label: 'ATT', x: sx(40), y: sy(122), w: sx(48), h: sy(20), fontSize: 11, align: 'left' },
+      { key: 'str', label: 'STR', x: sx(40), y: sy(180), w: sx(48), h: sy(20), fontSize: 11, align: 'left' },
+      { key: 'los', label: 'LOS', x: sx(40), y: sy(238), w: sx(48), h: sy(20), fontSize: 11, align: 'left' },
+      { key: 'con', label: 'CON', x: sx(40), y: sy(296), w: sx(48), h: sy(20), fontSize: 11, align: 'left' },
     ],
     STAT_COLOR: 'rgba(255,255,255,0.95)',
     BACKS: [
@@ -129,7 +122,6 @@
     ],
   };
 
-  // Keep studio art wrap identical to ART (square, clear of the i-dot hole).
   CardLayout.ART_STUDIO = {
     x: CardLayout.ART.x,
     y: CardLayout.ART.y,

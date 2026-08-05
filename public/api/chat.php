@@ -419,6 +419,13 @@ if ($session['step'] === CARDY_STEP_CONFIRM) {
     if (count($replySuggestions) > 4) {
         $replySuggestions = array_slice($replySuggestions, 0, 4);
     }
+    // Identity chips: kill stale dock-pun generics; pad with type-aware invents.
+    if ($focusChip === 'identity') {
+        $replySuggestions = cardy_sanitize_name_suggestions(
+            $replySuggestions,
+            $session['visual_concept'] ?? []
+        );
+    }
 }
 
 if ($session['step'] === CARDY_STEP_REVISE && is_array($visualConcept)) {

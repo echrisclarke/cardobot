@@ -240,7 +240,7 @@
           bgUrl: this.assetBase + '/assets/img/01_CardBGtexture.png',
           hideTools: true,
         });
-        this.studio.setConcept(this.concept, this.stats);
+        await this.studio.setConcept(this.concept, this.stats);
         if (this.artUrl) await this.studio.setArt(this.artUrl);
         this._syncColorSlidersFromStudio();
         this._syncCreditToggle();
@@ -250,7 +250,15 @@
       if (backs.length) {
         this.backArt.src = this.assetBase + '/assets/img/cardbacks/' + backs[this.backVariant % backs.length];
       }
-      this.el.querySelector('[data-back-name]').textContent = this.concept.nickname || this.concept.subject || 'Card';
+      let backName = String(this.concept.nickname || this.concept.subject || 'Card').trim();
+      const nickCap = (global.CardobotLayout && global.CardobotLayout.LIMITS
+        && global.CardobotLayout.LIMITS.nickname) || 16;
+      if (backName.length > nickCap) {
+        const cut = backName.slice(0, nickCap);
+        const sp = cut.lastIndexOf(' ');
+        backName = (sp >= 4 ? cut.slice(0, sp) : cut).trim();
+      }
+      this.el.querySelector('[data-back-name]').textContent = backName;
       this.el.querySelector('[data-back-type]').textContent = (this.concept.type || 'BOT') + ' · Card-o-Bot';
       this._applyBackTint();
       this._applyTransform();

@@ -3,6 +3,9 @@
 <head>
   <meta charset="utf-8">
   <title>Card layout smoke test</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="../../assets/css/studio.css">
   <style>
     body { font-family: system-ui, sans-serif; background: #222; color: #eee; padding: 1rem; }
@@ -77,9 +80,15 @@
         bgUrl: assetBase + '/assets/img/01_CardBGtexture.png',
         hideTools: true,
       });
-      studio.setConcept(concept, stats);
+      if (document.fonts && document.fonts.load) {
+        try {
+          await document.fonts.load('12px "Press Start 2P"');
+          await document.fonts.ready;
+        } catch (e) { /* continue with fallback */ }
+      }
+      await studio.setConcept(concept, stats);
       await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
-      await new Promise((r) => setTimeout(r, 60));
+      await new Promise((r) => setTimeout(r, 80));
 
       const fails = [];
       const checks = [
@@ -94,10 +103,20 @@
         ['ability', studio.abilityEl],
         ...Object.keys(studio.statEls).map((k) => ['stat-' + k, studio.statEls[k]]),
       ];
+      if (!(document.fonts && document.fonts.check && document.fonts.check('12px "Press Start 2P"'))) {
+        fails.push('Press Start 2P not loaded (metrics would be wrong)');
+      }
+
       checks.forEach(([label, el]) => {
         if (!el || !el.textContent) {
           fails.push(label + ' missing');
           return;
+        }
+        if (label === 'mass' && /^ass:/i.test(el.textContent.trim())) {
+          fails.push('mass clipped to "ass:" (font/fit bug)');
+        }
+        if (label === 'mass' && !/\b(kg|t|g|lb)\b/i.test(el.textContent)) {
+          fails.push('mass missing unit');
         }
         const powerOverflow = (label === 'power' || label === 'ability')
           ? (el.scrollWidth > el.clientWidth + 1
@@ -124,9 +143,12 @@
         }
       });
 
-      const artLeft = window.CardobotLayout.ART.x / window.CardobotLayout.CARD_W;
+      // Square art is centered; nickname sits in the printed name band (left of art is OK).
+      const nickLeftTarget = window.CardobotLayout.NICKNAME.x / window.CardobotLayout.CARD_W;
       const nickP = pct(studio.nickEl, studio.card);
-      if (nickP.left + 0.002 < artLeft) fails.push('nickname left of art (' + nickP.left.toFixed(3) + ')');
+      if (Math.abs(nickP.left - nickLeftTarget) > 0.025) {
+        fails.push('nickname left off name band (' + nickP.left.toFixed(3) + ' vs ' + nickLeftTarget.toFixed(3) + ')');
+      }
       if (nickP.top < 0.040) fails.push('nickname too high (' + nickP.top.toFixed(3) + ')');
       if (nickP.top > 0.075) fails.push('nickname too low (' + nickP.top.toFixed(3) + ')');
 
@@ -220,7 +242,7 @@
       }, stats));
       results.push(await runCase('bio-long', {
         ...base,
-        nickname: 'Night Map Fold Extra',
+        nickname: 'Night Map Fold',
         power_name: 'CARGO TEA STATIC TOO LONG',
         power_mode: 'rule',
         power_value: '2T',
@@ -231,7 +253,22 @@
         stats_ink: 'ice',
         card_bg: 'night_steel',
         bio: 'Dock kid with a satchel of bolts and a half-finished star map. Safe from the next hit for 2 turns.',
-      }, { hp: 100, npo: 100, att: 7, str: 0, los: 54, con: 66, height: '1.5 m', mass: '54 kg' }));
+      }, { hp: 100, npo: 100, att: 7, str: 0, los: 54, con: 66, height: '1.5 m', mass: '180 kg' }));
+      results.push(await runCase('dock-rust-meta', {
+        ...base,
+        nickname: 'Dock Rust',
+        type: 'Bot',
+        power_name: 'INFER HULL',
+        power_mode: 'stat',
+        power_value: '1T',
+        ability_name: 'DOCK DECAY',
+        ability_line: '1T CUR',
+        name_ink: 'charcoal',
+        stats_ink: 'ice',
+        card_bg: 'dock_teal',
+        bio: 'Built from salvaged bay doors and a foglamp, it polishes one surface while the rest rusts in salt air.',
+        creator_username: 'echrisclarke',
+      }, { hp: 60, npo: 46, att: 58, str: 22, los: 49, con: 59, height: '2.1 m', mass: '180 kg' }));
 
       const lines = [];
       let failed = 0;

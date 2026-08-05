@@ -7,13 +7,13 @@
 require_once __DIR__ . '/openai.php';
 require_once __DIR__ . '/card_brand.php';
 
-// Face-fit caps (must match card-layout.js LIMITS; never rely on ellipsis).
-const CARDY_LIMIT_NICKNAME = 22;
-const CARDY_LIMIT_POWER = 18;
-const CARDY_LIMIT_ABILITY_NAME = 16;
-const CARDY_LIMIT_ABILITY = 12;
-const CARDY_LIMIT_BIO = 220;
-const CARDY_LIMIT_POWER_VALUE = 10;
+// Face-fit caps for Press Start 2P (must match card-layout.js LIMITS).
+const CARDY_LIMIT_NICKNAME = 16;
+const CARDY_LIMIT_POWER = 12;
+const CARDY_LIMIT_ABILITY_NAME = 12;
+const CARDY_LIMIT_ABILITY = 8;
+const CARDY_LIMIT_BIO = 100;
+const CARDY_LIMIT_POWER_VALUE = 8;
 
 function cardy_clip(string $text, int $max): string {
     $text = trim(preg_replace('/\s+/u', ' ', $text) ?? $text);
