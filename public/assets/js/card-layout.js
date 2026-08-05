@@ -134,15 +134,15 @@
       align: 'left', maxLines: 5, lineHeight: 1.28, minFontSize: 5,
     },
     // Sans to match printed INFERENCE POWER / SPECIAL ABILITY; left-aligned in value column.
-    // Nudged up slightly so Roboto baselines match the printed label baselines.
+    // +1 card px (~half design unit) under the printed label baselines.
     POWER: {
-      x: sx(148), y: sy(429), w: sx(176), h: sy(16),
+      x: sx(148), y: sy(431) + 1, w: sx(176), h: sy(16),
       fontSize: 13, fontWeight: '500', color: 'rgba(218,239,237,0.95)',
       align: 'left', maxLines: 1, transform: 'uppercase', valign: 'center',
       lineHeight: 1, minFontSize: 8, fontFamily: 'sans',
     },
     ABILITY: {
-      x: sx(148), y: sy(444), w: sx(176), h: sy(16),
+      x: sx(148), y: sy(446) + 1, w: sx(176), h: sy(16),
       fontSize: 13, fontWeight: '500', color: 'rgba(249,187,170,0.95)',
       align: 'left', maxLines: 1, transform: 'uppercase', valign: 'center',
       lineHeight: 1, minFontSize: 8, fontFamily: 'sans',
