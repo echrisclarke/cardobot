@@ -206,6 +206,15 @@
         if (p.left < 0.10 || p.left > 0.15) fails.push('stat-' + k + ' left off titles (' + p.left.toFixed(3) + ')');
       });
 
+      const art = window.CardobotLayout.ART;
+      const artLeft = art.x / window.CardobotLayout.CARD_W;
+      const artRight = (art.x + art.w) / window.CardobotLayout.CARD_W;
+      [['type', studio.typeEl], ['height', studio.heightEl], ['mass', studio.massEl]].forEach(([label, el]) => {
+        const p = pct(el, studio.card);
+        if (p.left < artLeft - 0.01) fails.push(label + ' left of art window (' + p.left.toFixed(3) + ')');
+        if (p.right > artRight + 0.01) fails.push(label + ' right of art window (' + p.right.toFixed(3) + ')');
+      });
+
       const bioP = pct(studio.bioEl, studio.card);
       // Keep clear of printed INFERENCE POWER header band.
       if (bioP.bottom > 0.845) fails.push('bio into power panel (' + bioP.bottom.toFixed(3) + ')');
