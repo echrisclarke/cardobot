@@ -65,6 +65,8 @@ function render_console($pageTitle = 'Card-o-Bot', $contentCallback = null, $con
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?php echo htmlspecialchars($pageTitle); ?></title>
+    <link rel="icon" type="image/png" href="<?php echo cardobot_asset_url('assets/img/CardobotLogo2-21.png'); ?>">
+    <link rel="apple-touch-icon" href="<?php echo cardobot_asset_url('assets/img/CardobotLogo2-21.png'); ?>">
     <link rel="stylesheet" href="<?php echo cardobot_asset_url('assets/css/base.css'); ?>">
 </head>
 <body class="console-page">
@@ -154,6 +156,8 @@ function console_start($pageTitle = 'Card-o-Bot', $isLoginPage = false) {
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?php echo htmlspecialchars($pageTitle); ?></title>
+    <link rel="icon" type="image/png" href="<?php echo cardobot_asset_url('assets/img/CardobotLogo2-21.png'); ?>">
+    <link rel="apple-touch-icon" href="<?php echo cardobot_asset_url('assets/img/CardobotLogo2-21.png'); ?>">
     <link rel="stylesheet" href="<?php echo cardobot_asset_url('assets/css/base.css'); ?>">
 </head>
 <body class="<?php echo $bodyClasses; ?>">

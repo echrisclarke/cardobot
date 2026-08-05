@@ -3,7 +3,7 @@
  * English UI string catalog (source of truth).
  * Bump I18N_CATALOG_VERSION when keys are added so missing locales fill new keys only.
  */
-const I18N_CATALOG_VERSION = 1;
+const I18N_CATALOG_VERSION = 2;
 
 function i18n_catalog_en(): array {
     return [
@@ -38,6 +38,15 @@ function i18n_catalog_en(): array {
         'lang.other_placeholder' => 'e.g. French, 日本語, de',
         'lang.rejected' => 'I can use real natural languages, but not made-up ones like that. Try Spanish, Mandarin, French, or another living language.',
         'lang.set' => 'Got it. Console language locked in.',
+        'lang.confirm' => 'Looks like you speak {language}. Stay with that?',
+        'lang.confirm_yes' => 'Yes',
+        'lang.confirm_other' => 'Another language…',
+        'lang.change_prompt' => 'Which language should we switch to?',
+        'lang.changed' => 'Switched. Console language is now {language}.',
+
+        'resume.welcome' => 'Welcome back. Want to pick up where we left off, or start a new card?',
+        'resume.continue' => 'Continue',
+        'resume.new_card' => 'Start a new card',
 
         'path.fast' => 'Yeah, make a card',
         'path.long' => 'Make a detailed one',

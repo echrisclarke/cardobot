@@ -581,3 +581,185 @@ function i18n_locale_display_name(string $code): string {
     $pack = i18n_fetch_pack($code);
     return $pack['name_en'] !== '' ? $pack['name_en'] : $code;
 }
+
+function i18n_locale_native_name(string $code): string {
+    $code = i18n_normalize_code($code) ?: 'en';
+    if (isset(I18N_PRESET_LOCALES[$code]['name_native'])) {
+        return I18N_PRESET_LOCALES[$code]['name_native'];
+    }
+    $pack = i18n_fetch_pack($code);
+    return $pack['name_native'] !== '' ? $pack['name_native'] : ($pack['name_en'] !== '' ? $pack['name_en'] : $code);
+}
+
+/**
+ * Map a language tag (e.g. en-US, zh-CN) to a known/preset locale code.
+ */
+function i18n_match_language_tag(string $tag): ?string {
+    $tag = trim($tag);
+    if ($tag === '' || str_starts_with($tag, '*')) {
+        return null;
+    }
+    // Strip q= weight if present.
+    if (str_contains($tag, ';')) {
+        $tag = trim(explode(';', $tag, 2)[0]);
+    }
+    $norm = i18n_normalize_code($tag);
+    if ($norm === '') {
+        return null;
+    }
+    if (isset(I18N_PRESET_LOCALES[$norm])) {
+        return $norm;
+    }
+    // Primary subtag only (en from en-GB).
+    $primary = strtolower(explode('-', $norm)[0]);
+    if ($primary === 'zh') {
+        return 'zh-Hans';
+    }
+    if ($primary === 'pt') {
+        return 'pt-BR';
+    }
+    foreach (I18N_PRESET_LOCALES as $code => $_) {
+        if (strtolower(explode('-', $code)[0]) === $primary) {
+            return $code;
+        }
+    }
+    // Non-preset but valid BCP-47 primary: allow if 2–3 letter language.
+    if (preg_match('/^[a-z]{2,3}$/', $primary)) {
+        return i18n_normalize_code($primary) ?: $primary;
+    }
+    return null;
+}
+
+function i18n_detect_from_accept_language(?string $header = null): ?string {
+    if ($header === null) {
+        $header = (string)($_SERVER['HTTP_ACCEPT_LANGUAGE'] ?? '');
+    }
+    $header = trim($header);
+    if ($header === '') {
+        return null;
+    }
+    $parts = array_map('trim', explode(',', $header));
+    $ranked = [];
+    foreach ($parts as $part) {
+        if ($part === '') {
+            continue;
+        }
+        $q = 1.0;
+        if (preg_match('/;q=([0-9.]+)/i', $part, $m)) {
+            $q = (float)$m[1];
+        }
+        $tag = trim(explode(';', $part, 2)[0]);
+        $ranked[] = ['tag' => $tag, 'q' => $q];
+    }
+    usort($ranked, static fn($a, $b) => $b['q'] <=> $a['q']);
+    foreach ($ranked as $row) {
+        $matched = i18n_match_language_tag($row['tag']);
+        if ($matched !== null) {
+            return $matched;
+        }
+    }
+    return null;
+}
+
+/**
+ * @param list<string>|mixed $languages
+ */
+function i18n_detect_from_navigator_languages($languages): ?string {
+    if (!is_array($languages)) {
+        return null;
+    }
+    foreach ($languages as $lang) {
+        if (!is_string($lang)) {
+            continue;
+        }
+        $matched = i18n_match_language_tag($lang);
+        if ($matched !== null) {
+            return $matched;
+        }
+    }
+    return null;
+}
+
+/**
+ * Predict locale: preferred_locale > Accept-Language > navigator.languages > en.
+ *
+ * @param list<string>|null $navigatorLanguages
+ */
+function i18n_predict_locale(int $userId, ?array $navigatorLanguages = null): string {
+    $pref = $userId > 0 ? i18n_user_preferred_locale($userId) : null;
+    if ($pref) {
+        return $pref;
+    }
+    $fromHeader = i18n_detect_from_accept_language();
+    if ($fromHeader) {
+        return $fromHeader;
+    }
+    $fromNav = i18n_detect_from_navigator_languages($navigatorLanguages ?? []);
+    if ($fromNav) {
+        return $fromNav;
+    }
+    return 'en';
+}
+
+/**
+ * Detect mid-chat "change language" intent.
+ * Returns ['intent' => bool, 'target' => ?string] where target is a locale code if named.
+ */
+function i18n_detect_change_language_intent(string $message): array {
+    $raw = trim($message);
+    if ($raw === '') {
+        return ['intent' => false, 'target' => null];
+    }
+    $low = mb_strtolower($raw);
+
+    $phrases = [
+        'change language', 'switch language', 'switch to', 'change to',
+        'set language', 'use spanish', 'use english', 'use chinese', 'use mandarin',
+        'hablar en', 'cambiar idioma', 'cambiar lengua', 'en español', 'en espanol',
+        '换成', '换语言', '切换语言', '改成中文', '用中文', '用法语',
+        'changer de langue', 'parler en', 'sprache wechseln', 'auf deutsch',
+        '言語を', '言語変更', '언어 변경', 'mudar idioma', 'cambia lingua',
+    ];
+    $intent = false;
+    foreach ($phrases as $p) {
+        if (str_contains($low, $p)) {
+            $intent = true;
+            break;
+        }
+    }
+    // Bare "language?" / "idioma?" after some progress is weak; require stronger cue.
+    if (!$intent && (preg_match('/\b(language|idioma|langue|sprache|语言|言語|언어)\b/u', $low)
+        && preg_match('/\b(change|switch|set|cambiar|changer|wechseln|换成|切换|change|mudar|cambia)\b/u', $low))) {
+        $intent = true;
+    }
+    if (!$intent) {
+        return ['intent' => false, 'target' => null];
+    }
+
+    // Try to extract a named target language from the message.
+    $chipMap = [
+        'english' => 'en', 'inglés' => 'en', 'ingles' => 'en',
+        'spanish' => 'es', 'español' => 'es', 'espanol' => 'es',
+        'chinese' => 'zh-Hans', 'mandarin' => 'zh-Hans', '中文' => 'zh-Hans', '普通话' => 'zh-Hans',
+        'french' => 'fr', 'français' => 'fr', 'francais' => 'fr',
+        'german' => 'de', 'deutsch' => 'de',
+        'japanese' => 'ja', '日本語' => 'ja',
+        'portuguese' => 'pt-BR', 'português' => 'pt-BR', 'portugues' => 'pt-BR',
+        'korean' => 'ko', '한국어' => 'ko',
+        'italian' => 'it', 'italiano' => 'it',
+    ];
+    foreach ($chipMap as $name => $code) {
+        if (str_contains($low, $name) || str_contains($raw, $name)) {
+            return ['intent' => true, 'target' => $code];
+        }
+    }
+    // "switch to fr" / "change to de"
+    if (preg_match('/\b(?:to|a|en|auf|zu|para|in)\s+([a-z]{2,3}(?:-[A-Za-z0-9]+)?)\b/u', $low, $m)) {
+        $matched = i18n_match_language_tag($m[1]);
+        if ($matched) {
+            return ['intent' => true, 'target' => $matched];
+        }
+    }
+
+    return ['intent' => true, 'target' => null];
+}

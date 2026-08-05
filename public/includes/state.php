@@ -54,17 +54,7 @@ function cardy_session_create(?string $sessionId = null): array {
     return $session;
 }
 
-function cardy_session_find(string $sessionId): ?array {
-    if ($sessionId === '') {
-        return null;
-    }
-    if (!isset($_SESSION['cardobot_sessions']) || !is_array($_SESSION['cardobot_sessions'])) {
-        return null;
-    }
-    if (!isset($_SESSION['cardobot_sessions'][$sessionId])) {
-        return null;
-    }
-    $session = $_SESSION['cardobot_sessions'][$sessionId];
+function cardy_session_normalize(array $session): array {
     $session['visual_concept'] = cardy_scrub_meta_concept(cardy_merge_concept(
         cardy_empty_concept(),
         is_array($session['visual_concept'] ?? null) ? $session['visual_concept'] : []
@@ -78,6 +68,9 @@ function cardy_session_find(string $sessionId): ?array {
     if (!isset($session['path'])) {
         $session['path'] = null;
     }
+    if (!isset($session['locale_picked'])) {
+        $session['locale_picked'] = false;
+    }
     // Normalize legacy gather steps to agenda
     $step = $session['step'] ?? '';
     if (in_array($step, [
@@ -89,6 +82,153 @@ function cardy_session_find(string $sessionId): ?array {
         $session['step'] = CARDY_STEP_AGENDA;
     }
     return $session;
+}
+
+function cardy_ensure_chat_sessions_schema(?PDO $pdo = null): void {
+    if ($pdo === null) {
+        if (!function_exists('get_db_connection')) {
+            require_once __DIR__ . '/env.php';
+        }
+        $pdo = get_db_connection();
+    }
+    if (!$pdo) {
+        return;
+    }
+    static $done = false;
+    if ($done) {
+        return;
+    }
+    try {
+        $pdo->exec("CREATE TABLE IF NOT EXISTS `cardobot_chat_sessions` (
+            `user_id` INT UNSIGNED NOT NULL PRIMARY KEY,
+            `session_id` VARCHAR(64) NOT NULL,
+            `payload` LONGTEXT NOT NULL,
+            `updated_at` INT UNSIGNED NOT NULL DEFAULT 0,
+            INDEX `idx_session_id` (`session_id`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+        $done = true;
+    } catch (Throwable $e) {
+        error_log('cardy_ensure_chat_sessions_schema: ' . $e->getMessage());
+    }
+}
+
+function cardy_session_current_user_id(): int {
+    if (!empty($_SESSION['user']['id'])) {
+        return (int)$_SESSION['user']['id'];
+    }
+    return 0;
+}
+
+function cardy_session_persist_db(array $session, ?int $userId = null): void {
+    $userId = $userId ?? cardy_session_current_user_id();
+    if ($userId <= 0 || empty($session['id'])) {
+        return;
+    }
+    $pdo = function_exists('get_db_connection') ? get_db_connection() : null;
+    if (!$pdo) {
+        return;
+    }
+    cardy_ensure_chat_sessions_schema($pdo);
+    try {
+        $payload = json_encode($session, JSON_UNESCAPED_UNICODE);
+        if ($payload === false) {
+            return;
+        }
+        $stmt = $pdo->prepare(
+            'INSERT INTO cardobot_chat_sessions (user_id, session_id, payload, updated_at)
+             VALUES (?, ?, ?, ?)
+             ON DUPLICATE KEY UPDATE session_id = VALUES(session_id), payload = VALUES(payload), updated_at = VALUES(updated_at)'
+        );
+        $stmt->execute([$userId, (string)$session['id'], $payload, (int)($session['updated_at'] ?? time())]);
+    } catch (Throwable $e) {
+        error_log('cardy_session_persist_db: ' . $e->getMessage());
+    }
+}
+
+function cardy_session_load_for_user(int $userId): ?array {
+    if ($userId <= 0) {
+        return null;
+    }
+    $pdo = function_exists('get_db_connection') ? get_db_connection() : null;
+    if (!$pdo) {
+        return null;
+    }
+    cardy_ensure_chat_sessions_schema($pdo);
+    try {
+        $stmt = $pdo->prepare('SELECT session_id, payload FROM cardobot_chat_sessions WHERE user_id = ? LIMIT 1');
+        $stmt->execute([$userId]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$row) {
+            return null;
+        }
+        $decoded = json_decode((string)($row['payload'] ?? ''), true);
+        if (!is_array($decoded) || empty($decoded['id'])) {
+            return null;
+        }
+        $decoded = cardy_session_normalize($decoded);
+        if (!isset($_SESSION['cardobot_sessions']) || !is_array($_SESSION['cardobot_sessions'])) {
+            $_SESSION['cardobot_sessions'] = [];
+        }
+        $_SESSION['cardobot_sessions'][$decoded['id']] = $decoded;
+        return $decoded;
+    } catch (Throwable $e) {
+        error_log('cardy_session_load_for_user: ' . $e->getMessage());
+        return null;
+    }
+}
+
+function cardy_session_clear_for_user(int $userId): void {
+    if ($userId <= 0) {
+        return;
+    }
+    $pdo = function_exists('get_db_connection') ? get_db_connection() : null;
+    if ($pdo) {
+        cardy_ensure_chat_sessions_schema($pdo);
+        try {
+            $stmt = $pdo->prepare('DELETE FROM cardobot_chat_sessions WHERE user_id = ?');
+            $stmt->execute([$userId]);
+        } catch (Throwable $e) {
+            error_log('cardy_session_clear_for_user: ' . $e->getMessage());
+        }
+    }
+    if (isset($_SESSION['cardobot_sessions']) && is_array($_SESSION['cardobot_sessions'])) {
+        // Drop in-memory slots for this user by clearing all card sessions on wipe.
+        // (One active conversation per user in v1.)
+        $_SESSION['cardobot_sessions'] = [];
+    }
+}
+
+function cardy_session_is_resumable(array $session): bool {
+    $history = $session['history'] ?? [];
+    if (is_array($history) && count($history) > 0) {
+        return true;
+    }
+    if (!empty($session['locale_picked'])) {
+        return true;
+    }
+    $step = (string)($session['step'] ?? CARDY_STEP_GREETING);
+    return $step !== '' && $step !== CARDY_STEP_GREETING;
+}
+
+function cardy_session_find(string $sessionId): ?array {
+    if ($sessionId === '') {
+        return null;
+    }
+    if (!isset($_SESSION['cardobot_sessions']) || !is_array($_SESSION['cardobot_sessions'])) {
+        $_SESSION['cardobot_sessions'] = [];
+    }
+    if (!isset($_SESSION['cardobot_sessions'][$sessionId])) {
+        // Hydrate from DB if this is the user's active chat session.
+        $userId = cardy_session_current_user_id();
+        if ($userId > 0) {
+            $loaded = cardy_session_load_for_user($userId);
+            if ($loaded !== null && ($loaded['id'] ?? '') === $sessionId) {
+                return $loaded;
+            }
+        }
+        return null;
+    }
+    return cardy_session_normalize($_SESSION['cardobot_sessions'][$sessionId]);
 }
 
 function cardy_session_get(string $sessionId): array {
@@ -107,7 +247,11 @@ function cardy_session_save(array $session): void {
         return;
     }
     $session['updated_at'] = time();
+    if (!isset($_SESSION['cardobot_sessions']) || !is_array($_SESSION['cardobot_sessions'])) {
+        $_SESSION['cardobot_sessions'] = [];
+    }
     $_SESSION['cardobot_sessions'][$session['id']] = $session;
+    cardy_session_persist_db($session);
 }
 
 function cardy_merge_concept(array $base, array $patch): array {

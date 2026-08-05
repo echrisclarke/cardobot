@@ -340,6 +340,9 @@ body.chat-page .chat-messages.show-cardy-bg {
         locale: 'en',
         localePicked: false,
         awaitingOtherLocale: false,
+        awaitingLocaleConfirm: false,
+        awaitingLanguageSwitch: false,
+        resumeOffered: false,
         i18n: {},
         pendingRender: false,
         pendingRenderStatus: '',
@@ -348,10 +351,12 @@ body.chat-page .chat-messages.show-cardy-bg {
         savedCardId: null,
         visualConcept: null,
 
-        // Async-loaded greeting (so the loading bar has something to wait for).
+        // Async-loaded greeting / resume (so the loading bar has something to wait for).
         greeting: null,           // { message, suggestions, session_id }
         greetingReady: false,
         greetingError: null,
+        resumed: false,
+        resumeHistory: null,
 
         cardyFirstMessageShown: false,
         busy: false,
@@ -443,6 +448,41 @@ body.chat-page .chat-messages.show-cardy-bg {
         return null;
     }
 
+    function isConfirmYesChip(text) {
+        const lower = String(text || '').toLowerCase().trim();
+        const yes = t('lang.confirm_yes', 'Yes').toLowerCase();
+        return lower === yes || lower === 'yes' || lower === 'y' || lower === 'ok' || lower === 'okay'
+            || lower === 'sure' || lower === 'sí' || lower === 'si' || lower === '好的' || lower === '好';
+    }
+
+    function isConfirmOtherChip(text) {
+        const lower = String(text || '').toLowerCase().trim();
+        const other = t('lang.confirm_other', 'Another language…').toLowerCase();
+        return lower === other || lower.startsWith('another') || lower.includes('otro idioma')
+            || lower.includes('换一种语言');
+    }
+
+    function isResumeContinueChip(text) {
+        const lower = String(text || '').toLowerCase().trim();
+        return lower === t('resume.continue', 'Continue').toLowerCase() || lower === 'continue';
+    }
+
+    function isResumeNewCardChip(text) {
+        const lower = String(text || '').toLowerCase().trim();
+        return lower === t('resume.new_card', 'Start a new card').toLowerCase()
+            || lower.includes('start a new card') || lower.includes('new card');
+    }
+
+    function navigatorLanguages() {
+        try {
+            if (Array.isArray(navigator.languages) && navigator.languages.length) {
+                return navigator.languages.slice(0, 8);
+            }
+            if (navigator.language) return [navigator.language];
+        } catch (e) {}
+        return [];
+    }
+
     // ============================================================
     //   HTTP helper
     // ============================================================
@@ -477,15 +517,88 @@ body.chat-page .chat-messages.show-cardy-bg {
     }
 
     // ============================================================
-    //   Stage 1: pre-load Cardy's greeting in the background
+    //   Stage 1: resume existing chat, or pre-load greeting
     // ============================================================
+    function applyBootPayload(data) {
+        state.sessionId = data.session_id;
+        state.step = data.step || state.step;
+        state.mode = data.mode || null;
+        state.path = data.path || null;
+        if (data.locale) state.locale = data.locale;
+        if (typeof data.locale_picked === 'boolean') state.localePicked = data.locale_picked;
+        if (typeof data.awaiting_other_locale === 'boolean') state.awaitingOtherLocale = data.awaiting_other_locale;
+        if (typeof data.awaiting_locale_confirm === 'boolean') state.awaitingLocaleConfirm = data.awaiting_locale_confirm;
+        if (typeof data.awaiting_language_switch === 'boolean') state.awaitingLanguageSwitch = data.awaiting_language_switch;
+        if (data.visual_concept) {
+            state.visualConcept = data.visual_concept;
+            lastConcept = data.visual_concept;
+        }
+        if (data.stats) lastStats = data.stats;
+        state.greeting = data;
+        state.greetingReady = true;
+        state.resumed = !!data.resumed;
+        state.resumeHistory = Array.isArray(data.history) ? data.history : null;
+        state.resumeOffered = !!data.resumed;
+        if (data.locale) {
+            state._packLocale = data.locale;
+            loadLocalePack(data.locale);
+        }
+    }
+
+    function skipIntroChrome() {
+        if ($introMessage) $introMessage.classList.add('hidden');
+        if ($introContinue) $introContinue.classList.add('hidden');
+        if ($chatLoadingBar) $chatLoadingBar.classList.add('hidden');
+        $chatMessages.classList.add('show-cardy-bg');
+        state.introComplete = true;
+        state.cardyFirstMessageShown = true;
+    }
+
+    function restoreResumedTranscript(data) {
+        skipIntroChrome();
+        const history = Array.isArray(data.history) ? data.history : [];
+        history.forEach((turn) => {
+            if (!turn || !turn.content) return;
+            if (turn.role === 'user') appendUserMessage(turn.content);
+            else appendCardyMessage(turn.content, false);
+        });
+        if ((data.image_url || data.image_b64) && (state.step === 'reveal' || state.step === 'studio')) {
+            const img = data.image_url || ('data:image/png;base64,' + data.image_b64);
+            const wrap = document.createElement('div');
+            wrap.className = 'chat-message cardy';
+            const imageEl = document.createElement('img');
+            imageEl.src = img;
+            imageEl.alt = 'Your card';
+            imageEl.className = 'card-inline-image';
+            wrap.appendChild(imageEl);
+            $chatMessages.appendChild(wrap);
+            state.imageElement = imageEl;
+        }
+        if (state.step === 'confirm') {
+            fillConfirmPanel(data.visual_concept || lastConcept, data.nickname_suggestions || []);
+        }
+        const welcome = data.message || t('resume.welcome', 'Welcome back. Want to pick up where we left off, or start a new card?');
+        const el = appendCardyMessage(welcome, true);
+        appendSuggestionsAfter(el, data.suggestions || [
+            t('resume.continue', 'Continue'),
+            t('resume.new_card', 'Start a new card'),
+        ]);
+        $chatMessages.scrollTop = $chatMessages.scrollHeight;
+    }
+
     async function preloadGreeting() {
         try {
-            const data = await postJson(basePath + '/api/chat.php', { action: 'greeting' });
+            const data = await postJson(basePath + '/api/chat.php', {
+                action: 'resume',
+                navigator_languages: navigatorLanguages(),
+            });
             if (!data.session_id) throw new Error('No session from Cardy');
-            state.sessionId = data.session_id;
-            state.greeting = data;
-            state.greetingReady = true;
+            applyBootPayload(data);
+            if (data.resumed) {
+                restoreResumedTranscript(data);
+                markGreetingReady();
+                return;
+            }
             markGreetingReady();
         } catch (err) {
             console.error('greeting preload failed:', err);
@@ -530,6 +643,10 @@ body.chat-page .chat-messages.show-cardy-bg {
     //   Stage 2: user clicks Continue on the intro story
     // ============================================================
     function proceedFromIntro() {
+        if (state.resumed) {
+            skipIntroChrome();
+            return;
+        }
         if ($introContinue) $introContinue.classList.add('hidden');
         $chatLoadingBar.classList.remove('hidden');
 
@@ -587,8 +704,17 @@ body.chat-page .chat-messages.show-cardy-bg {
 
     function showCardyGreeting() {
         if (!state.greeting) return; // shouldn't happen but defensive
+        if (state.resumed) {
+            // Transcript + welcome-back already rendered by restoreResumedTranscript.
+            state.introComplete = true;
+            return;
+        }
         state.step = state.greeting.step || 'greeting';
         state.mode = state.greeting.mode || null;
+        if (typeof state.greeting.locale_picked === 'boolean') state.localePicked = state.greeting.locale_picked;
+        if (typeof state.greeting.awaiting_locale_confirm === 'boolean') {
+            state.awaitingLocaleConfirm = state.greeting.awaiting_locale_confirm;
+        }
         state.introComplete = true;
         const messageEl = appendCardyMessage(state.greeting.message, true);
         appendSuggestionsAfter(messageEl, state.greeting.suggestions);
@@ -1202,13 +1328,52 @@ body.chat-page .chat-messages.show-cardy-bg {
     function handleSuggestion(text) {
         if (state.busy) return;
         clearStaleSuggestions();
+
+        // Resume welcome-back chips (do not echo "Continue" as a user turn).
+        if (state.resumeOffered) {
+            if (isResumeContinueChip(text)) {
+                state.resumeOffered = false;
+                clearStaleSuggestions();
+                sendChat({ action: 'continue_resume' });
+                return;
+            }
+            if (isResumeNewCardChip(text)) {
+                state.resumeOffered = false;
+                appendUserMessage(text);
+                handleMakeAnother();
+                return;
+            }
+        }
+
         appendUserMessage(text);
 
         const step = state.step;
         const lower = text.toLowerCase();
 
-        if (step === 'greeting' || state.awaitingOtherLocale) {
-            if (!state.localePicked || state.awaitingOtherLocale) {
+        if (state.awaitingLanguageSwitch) {
+            const code = localeCodeFromChip(text);
+            if (code === 'other') {
+                sendChat({ action: 'select_locale', value: 'other', user_message: text });
+                return;
+            }
+            if (code) {
+                sendChat({ action: 'select_locale', value: code, user_message: text });
+                return;
+            }
+            sendChat({ action: 'select_locale', user_message: text });
+            return;
+        }
+
+        if (step === 'greeting' || state.awaitingOtherLocale || state.awaitingLocaleConfirm) {
+            if (!state.localePicked || state.awaitingOtherLocale || state.awaitingLocaleConfirm) {
+                if (state.awaitingLocaleConfirm && isConfirmYesChip(text)) {
+                    sendChat({ action: 'select_locale', value: 'confirm_yes', user_message: text });
+                    return;
+                }
+                if (state.awaitingLocaleConfirm && isConfirmOtherChip(text)) {
+                    sendChat({ action: 'select_locale', value: 'confirm_other', user_message: text });
+                    return;
+                }
                 const code = localeCodeFromChip(text);
                 if (code === 'other') {
                     sendChat({ action: 'select_locale', value: 'other', user_message: text });
@@ -1274,15 +1439,47 @@ body.chat-page .chat-messages.show-cardy-bg {
         }
 
         clearStaleSuggestions();
+
+        if (state.resumeOffered) {
+            if (isResumeContinueChip(text)) {
+                state.resumeOffered = false;
+                sendChat({ action: 'continue_resume' });
+                return;
+            }
+            if (isResumeNewCardChip(text)) {
+                state.resumeOffered = false;
+                appendUserMessage(text);
+                handleMakeAnother();
+                return;
+            }
+        }
+
         appendUserMessage(text);
 
         const step = state.step;
+        if (state.awaitingLanguageSwitch) {
+            const code = localeCodeFromChip(text);
+            if (code && code !== 'other') {
+                sendChat({ action: 'select_locale', value: code, user_message: text });
+            } else {
+                sendChat({ action: 'select_locale', user_message: text });
+            }
+            return;
+        }
         if (state.mode === 'free_chat' || state.path === 'chat') {
             sendChat({ user_message: text });
             return;
         }
-        if (step === 'greeting' || state.awaitingOtherLocale) {
-            if (!state.localePicked || state.awaitingOtherLocale) {
+        if (step === 'greeting' || state.awaitingOtherLocale || state.awaitingLocaleConfirm) {
+            if (!state.localePicked || state.awaitingOtherLocale || state.awaitingLocaleConfirm) {
+                if (state.awaitingLocaleConfirm && isConfirmYesChip(text)) {
+                    sendChat({ action: 'select_locale', value: 'confirm_yes', user_message: text });
+                    return;
+                }
+                if (state.awaitingLocaleConfirm && isConfirmOtherChip(text)) {
+                    sendChat({ action: 'select_locale', value: 'confirm_other', user_message: text });
+                    return;
+                }
                 const code = localeCodeFromChip(text);
                 if (code && code !== 'other') {
                     sendChat({ action: 'select_locale', value: code, user_message: text });
@@ -1324,9 +1521,14 @@ body.chat-page .chat-messages.show-cardy-bg {
             if (data.locale) state.locale = data.locale;
             if (typeof data.locale_picked === 'boolean') state.localePicked = data.locale_picked;
             if (typeof data.awaiting_other_locale === 'boolean') state.awaitingOtherLocale = data.awaiting_other_locale;
-            if (data.locale && data.locale !== (state.i18n && state._packLocale)) {
-                state._packLocale = data.locale;
-                loadLocalePack(data.locale);
+            if (typeof data.awaiting_locale_confirm === 'boolean') state.awaitingLocaleConfirm = data.awaiting_locale_confirm;
+            if (typeof data.awaiting_language_switch === 'boolean') state.awaitingLanguageSwitch = data.awaiting_language_switch;
+            if (data.refresh_locale_pack || (data.locale && data.locale !== state._packLocale)) {
+                state._packLocale = data.locale || state.locale;
+                loadLocalePack(state._packLocale);
+            }
+            if (body.action === 'continue_resume') {
+                state.resumeOffered = false;
             }
             state.readyToRender = !!data.ready_to_render;
             if (data.visual_concept) {

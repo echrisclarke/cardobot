@@ -29,12 +29,26 @@ $userMessage = isset($data['user_message']) && is_string($data['user_message']) 
 $action      = isset($data['action']) && is_string($data['action']) ? $data['action'] : '';
 $value       = isset($data['value']) && is_string($data['value']) ? $data['value'] : '';
 $conceptPatch = isset($data['concept_patch']) && is_array($data['concept_patch']) ? $data['concept_patch'] : null;
+$navigatorLanguages = isset($data['navigator_languages']) && is_array($data['navigator_languages'])
+    ? $data['navigator_languages']
+    : null;
 
 if (mb_strlen($userMessage) > 1000) {
     $userMessage = mb_substr($userMessage, 0, 1000);
 }
 
-if ($sessionId !== '') {
+$resumed = false;
+$refreshLocalePack = false;
+
+if ($action === 'resume' && $sessionId === '') {
+    $loaded = cardy_session_load_for_user($userId);
+    if ($loaded !== null && cardy_session_is_resumable($loaded)) {
+        $session = $loaded;
+        $resumed = true;
+    } else {
+        $session = cardy_session_create();
+    }
+} elseif ($sessionId !== '') {
     $session = cardy_session_find($sessionId);
     if ($session === null) {
         api_error('unknown_session', 'Unknown session_id', 404);
@@ -60,14 +74,65 @@ if (!empty($session['locale'])) {
     i18n_set_session_locale($loc);
 }
 
-$greetingMessage = "Oh. A visitor. I'm Cardy. I run Card-o-Bot aboard this ship: we invent someone together, then I print them onto a trading card. Want to make one with me?\n\n"
-    . i18n_t('lang.prompt', 'en');
-$greetingSuggestions = [
+$brandIntro = "Oh. A visitor. I'm Cardy. I run Card-o-Bot aboard this ship: we invent someone together, then I print them onto a trading card. Want to make one with me?";
+$langPickerSuggestions = [
     i18n_t('lang.english', 'en'),
     i18n_t('lang.spanish', 'en'),
     i18n_t('lang.chinese', 'en'),
     i18n_t('lang.other', 'en'),
 ];
+$greetingSuggestions = $langPickerSuggestions;
+
+$cardy_apply_locale = static function (array &$session, string $code, int $userId, bool $changed = false) use (&$loc, &$refreshLocalePack): array {
+    $nameEn = I18N_PRESET_LOCALES[$code]['name_en'] ?? $code;
+    $nameNative = I18N_PRESET_LOCALES[$code]['name_native'] ?? $code;
+    $pack = i18n_ensure_locale($code, $nameEn, $nameNative);
+    $session['locale'] = $pack['code'];
+    $session['locale_picked'] = true;
+    $session['awaiting_other_locale'] = false;
+    $session['awaiting_locale_confirm'] = false;
+    i18n_set_session_locale($pack['code']);
+    i18n_save_user_locale($userId, $pack['code']);
+    $loc = $pack['code'];
+    $refreshLocalePack = true;
+    $langName = i18n_locale_native_name($pack['code']);
+    $message = $changed
+        ? i18n_t('lang.changed', $loc, ['language' => $langName])
+        : i18n_t('lang.set', $loc);
+    return [
+        'message' => $message,
+        'suggestions' => [
+            i18n_t('path.fast', $loc),
+            i18n_t('path.long', $loc),
+            i18n_t('path.form', $loc),
+            i18n_t('path.chat', $loc),
+        ],
+    ];
+};
+
+$cardy_soft_confirm_greeting = static function (array &$session, int $userId, ?array $navigatorLanguages) use ($brandIntro, &$loc): array {
+    $candidate = i18n_predict_locale($userId, $navigatorLanguages);
+    // Ensure pack exists so confirm copy can be localized.
+    $nameEn = I18N_PRESET_LOCALES[$candidate]['name_en'] ?? $candidate;
+    $nameNative = I18N_PRESET_LOCALES[$candidate]['name_native'] ?? $candidate;
+    i18n_ensure_locale($candidate, $nameEn, $nameNative);
+    $session['locale'] = $candidate;
+    $session['locale_picked'] = false;
+    $session['awaiting_locale_confirm'] = true;
+    $session['awaiting_other_locale'] = false;
+    $session['step'] = CARDY_STEP_GREETING;
+    i18n_set_session_locale($candidate);
+    $loc = $candidate;
+    $langName = i18n_locale_native_name($candidate);
+    return [
+        'message' => $brandIntro . "\n\n" . i18n_t('lang.confirm', $candidate, ['language' => $langName]),
+        'suggestions' => [
+            i18n_t('lang.confirm_yes', $candidate),
+            i18n_t('lang.confirm_other', $candidate),
+        ],
+    ];
+};
+
 $pathSuggestions = [
     i18n_t('path.fast', $loc),
     i18n_t('path.long', $loc),
@@ -76,8 +141,60 @@ $pathSuggestions = [
 ];
 
 switch ($action) {
+    case 'resume':
+        if ($resumed) {
+            $skipModel = true;
+            $loc = i18n_normalize_code((string)($session['locale'] ?? $loc)) ?: $loc;
+            i18n_set_session_locale($loc);
+            $staticMessage = i18n_t('resume.welcome', $loc);
+            $staticSuggestions = [
+                i18n_t('resume.continue', $loc),
+                i18n_t('resume.new_card', $loc),
+            ];
+            // Do not append welcome-back into history until we save below;
+            // flag so client can restore prior history separately.
+            $session['resume_offered'] = true;
+            break;
+        }
+        // No resumable session: soft-confirm greeting.
+        $greet = $cardy_soft_confirm_greeting($session, $userId, $navigatorLanguages);
+        $skipModel = true;
+        $staticMessage = $greet['message'];
+        $staticSuggestions = $greet['suggestions'];
+        $pathSuggestions = [
+            i18n_t('path.fast', $loc),
+            i18n_t('path.long', $loc),
+            i18n_t('path.form', $loc),
+            i18n_t('path.chat', $loc),
+        ];
+        break;
+
+    case 'continue_resume':
+        $skipModel = true;
+        $session['resume_offered'] = false;
+        $staticMessage = '';
+        $staticSuggestions = [];
+        $userMessage = '';
+        break;
+
     case 'reset':
-        $session = cardy_session_reset($session);
+        $keepLocale = i18n_normalize_code((string)($session['locale'] ?? $prefLocale ?? 'en')) ?: 'en';
+        $hadLocale = !empty($session['locale_picked']) || !empty($prefLocale);
+        if ($userId > 0) {
+            cardy_session_clear_for_user($userId);
+        }
+        $session = cardy_session_create();
+        $skipModel = true;
+        if ($hadLocale && $keepLocale !== '') {
+            $applied = $cardy_apply_locale($session, $keepLocale, $userId, false);
+            $staticMessage = $brandIntro . "\n\n" . $applied['message'];
+            $staticSuggestions = $applied['suggestions'];
+        } else {
+            $greet = $cardy_soft_confirm_greeting($session, $userId, $navigatorLanguages);
+            $staticMessage = $greet['message'];
+            $staticSuggestions = $greet['suggestions'];
+        }
+        $userMessage = '';
         break;
 
     case 'select_locale':
@@ -85,12 +202,55 @@ switch ($action) {
         $rawLang = $userMessage !== '' ? $userMessage : $value;
         $lowRaw = mb_strtolower(trim((string)$rawLang));
         $lowVal = mb_strtolower(trim((string)$value));
+
+        // Soft-confirm Yes: keep predicted/session locale.
+        $yesLabels = [
+            mb_strtolower(i18n_t('lang.confirm_yes', $loc)),
+            mb_strtolower(i18n_t('lang.confirm_yes', 'en')),
+            'yes', 'y', 'ok', 'okay', 'sure', 'sí', 'si', '好的', '好', 'oui', 'ja', 'はい', '네', 'sim', 'sì',
+        ];
+        $otherConfirmLabels = [
+            mb_strtolower(i18n_t('lang.confirm_other', $loc)),
+            mb_strtolower(i18n_t('lang.confirm_other', 'en')),
+            'another language', 'another language…', 'another language...',
+            'otro idioma', 'otro idioma…', '换一种语言', '换一种语言…',
+        ];
+        if (!empty($session['awaiting_locale_confirm'])) {
+            if ($lowVal === 'confirm_yes' || in_array($lowRaw, $yesLabels, true) || $lowRaw === 'yes') {
+                $keep = i18n_normalize_code((string)($session['locale'] ?? 'en')) ?: 'en';
+                $applied = $cardy_apply_locale($session, $keep, $userId, false);
+                $skipModel = true;
+                $staticMessage = $applied['message'];
+                $staticSuggestions = $applied['suggestions'];
+                $userMessage = '';
+                break;
+            }
+            if ($lowVal === 'confirm_other' || in_array($lowRaw, $otherConfirmLabels, true)
+                || str_starts_with($lowRaw, 'another') || str_contains($lowRaw, 'otro idioma')
+                || str_contains($lowRaw, '换一种语言')) {
+                $session['awaiting_locale_confirm'] = false;
+                $skipModel = true;
+                $staticMessage = i18n_t('lang.prompt', $loc);
+                $staticSuggestions = $langPickerSuggestions;
+                $userMessage = '';
+                break;
+            }
+        }
+
         if ($code === 'other' || $lowVal === 'other' || $lowRaw === mb_strtolower(i18n_t('lang.other', 'en'))
-            || $lowRaw === 'other…' || $lowRaw === 'other...' || str_starts_with($lowRaw, 'other')) {
+            || $lowRaw === 'other…' || $lowRaw === 'other...' || str_starts_with($lowRaw, 'other')
+            || in_array($lowRaw, $otherConfirmLabels, true)) {
             $skipModel = true;
-            $staticMessage = i18n_t('lang.other_prompt', $loc);
-            $staticSuggestions = [];
-            $session['awaiting_other_locale'] = true;
+            $session['awaiting_locale_confirm'] = false;
+            if ($code === 'other' || $lowVal === 'other' || str_starts_with($lowRaw, 'other')
+                || $lowRaw === mb_strtolower(i18n_t('lang.other', 'en'))) {
+                $staticMessage = i18n_t('lang.other_prompt', $loc);
+                $staticSuggestions = [];
+                $session['awaiting_other_locale'] = true;
+            } else {
+                $staticMessage = i18n_t('lang.prompt', $loc);
+                $staticSuggestions = $langPickerSuggestions;
+            }
             $userMessage = '';
             break;
         }
@@ -115,7 +275,7 @@ switch ($action) {
                 if (empty($validated['ok'])) {
                     $skipModel = true;
                     $staticMessage = $validated['message'] ?? i18n_t('lang.rejected', $loc);
-                    $staticSuggestions = $greetingSuggestions;
+                    $staticSuggestions = $langPickerSuggestions;
                     break;
                 }
                 $code = $validated['code'];
@@ -126,26 +286,36 @@ switch ($action) {
         if ($code === '') {
             $skipModel = true;
             $staticMessage = i18n_t('lang.prompt', $loc);
-            $staticSuggestions = $greetingSuggestions;
+            $staticSuggestions = $langPickerSuggestions;
             break;
         }
         $nameEn = $nameEn ?? (I18N_PRESET_LOCALES[$code]['name_en'] ?? $code);
         $nameNative = $nameNative ?? (I18N_PRESET_LOCALES[$code]['name_native'] ?? $code);
         $pack = i18n_ensure_locale($code, $nameEn, $nameNative);
+        $midSwitch = !empty($session['awaiting_language_switch'])
+            || (!empty($session['locale_picked']) && $session['step'] !== CARDY_STEP_GREETING);
         $session['locale'] = $pack['code'];
         $session['locale_picked'] = true;
         $session['awaiting_other_locale'] = false;
+        $session['awaiting_locale_confirm'] = false;
+        $session['awaiting_language_switch'] = false;
         i18n_set_session_locale($pack['code']);
         i18n_save_user_locale($userId, $pack['code']);
         $loc = $pack['code'];
+        $refreshLocalePack = true;
         $skipModel = true;
-        $staticMessage = i18n_t('lang.set', $loc);
-        $staticSuggestions = [
-            i18n_t('path.fast', $loc),
-            i18n_t('path.long', $loc),
-            i18n_t('path.form', $loc),
-            i18n_t('path.chat', $loc),
-        ];
+        if ($midSwitch) {
+            $staticMessage = i18n_t('lang.changed', $loc, ['language' => i18n_locale_native_name($loc)]);
+            $staticSuggestions = [];
+        } else {
+            $staticMessage = i18n_t('lang.set', $loc);
+            $staticSuggestions = [
+                i18n_t('path.fast', $loc),
+                i18n_t('path.long', $loc),
+                i18n_t('path.form', $loc),
+                i18n_t('path.chat', $loc),
+            ];
+        }
         $userMessage = '';
         break;
 
@@ -298,7 +468,7 @@ switch ($action) {
         $skipModel = true;
         $session['step'] = CARDY_STEP_GREETING;
         if (!empty($session['locale_picked'])) {
-            $staticMessage = "Oh. A visitor. I'm Cardy. I run Card-o-Bot aboard this ship: we invent someone together, then I print them onto a trading card. Want to make one with me?";
+            $staticMessage = $brandIntro;
             $staticSuggestions = [
                 i18n_t('path.fast', $loc),
                 i18n_t('path.long', $loc),
@@ -306,28 +476,64 @@ switch ($action) {
                 i18n_t('path.chat', $loc),
             ];
         } else {
-            $staticMessage = $greetingMessage;
-            $staticSuggestions = $greetingSuggestions;
+            $greet = $cardy_soft_confirm_greeting($session, $userId, $navigatorLanguages);
+            $staticMessage = $greet['message'];
+            $staticSuggestions = $greet['suggestions'];
         }
         break;
 
     default:
+        // Soft-confirm Yes / Another via free text at greeting.
+        if ($userMessage !== '' && $session['step'] === CARDY_STEP_GREETING
+            && !empty($session['awaiting_locale_confirm']) && empty($session['locale_picked'])) {
+            $low = mb_strtolower(trim($userMessage));
+            $yesLabels = [
+                mb_strtolower(i18n_t('lang.confirm_yes', $loc)),
+                mb_strtolower(i18n_t('lang.confirm_yes', 'en')),
+                'yes', 'y', 'ok', 'okay', 'sure', 'sí', 'si', '好的', '好',
+            ];
+            $otherLabels = [
+                mb_strtolower(i18n_t('lang.confirm_other', $loc)),
+                mb_strtolower(i18n_t('lang.confirm_other', 'en')),
+            ];
+            if (in_array($low, $yesLabels, true)) {
+                $keep = i18n_normalize_code((string)($session['locale'] ?? 'en')) ?: 'en';
+                $applied = $cardy_apply_locale($session, $keep, $userId, false);
+                $skipModel = true;
+                $staticMessage = $applied['message'];
+                $staticSuggestions = $applied['suggestions'];
+                $userMessage = '';
+                break;
+            }
+            if (in_array($low, $otherLabels, true) || str_starts_with($low, 'another')
+                || str_contains($low, 'otro idioma') || str_contains($low, '换一种语言')) {
+                $session['awaiting_locale_confirm'] = false;
+                $skipModel = true;
+                $staticMessage = i18n_t('lang.prompt', $loc);
+                $staticSuggestions = $langPickerSuggestions;
+                $userMessage = '';
+                break;
+            }
+        }
+
         // Free-typed "Other" language while awaiting locale.
         if (!empty($session['awaiting_other_locale']) && $userMessage !== '') {
             $validated = i18n_validate_language($userMessage);
             if (empty($validated['ok'])) {
                 $skipModel = true;
                 $staticMessage = $validated['message'] ?? i18n_t('lang.rejected', $loc);
-                $staticSuggestions = $greetingSuggestions;
+                $staticSuggestions = $langPickerSuggestions;
                 $userMessage = '';
             } else {
                 $pack = i18n_ensure_locale($validated['code'], $validated['name_en'], $validated['name_native']);
                 $session['locale'] = $pack['code'];
                 $session['locale_picked'] = true;
                 $session['awaiting_other_locale'] = false;
+                $session['awaiting_locale_confirm'] = false;
                 i18n_set_session_locale($pack['code']);
                 i18n_save_user_locale($userId, $pack['code']);
                 $loc = $pack['code'];
+                $refreshLocalePack = true;
                 $skipModel = true;
                 $staticMessage = i18n_t('lang.set', $loc);
                 $staticSuggestions = [
@@ -340,6 +546,66 @@ switch ($action) {
             }
             break;
         }
+
+        // Mid-chat language change (locale already picked).
+        if ($userMessage !== '' && !empty($session['locale_picked'])
+            && empty($session['awaiting_other_locale'])
+            && $session['step'] !== CARDY_STEP_GREETING) {
+            $change = i18n_detect_change_language_intent($userMessage);
+            if (!empty($change['intent'])) {
+                $session['history'][] = ['role' => 'user', 'content' => $userMessage];
+                $skipModel = true;
+                if (!empty($change['target'])) {
+                    $code = i18n_normalize_code((string)$change['target']);
+                    $nameEn = I18N_PRESET_LOCALES[$code]['name_en'] ?? $code;
+                    $nameNative = I18N_PRESET_LOCALES[$code]['name_native'] ?? $code;
+                    $pack = i18n_ensure_locale($code, $nameEn, $nameNative);
+                    $session['locale'] = $pack['code'];
+                    i18n_set_session_locale($pack['code']);
+                    i18n_save_user_locale($userId, $pack['code']);
+                    $loc = $pack['code'];
+                    $refreshLocalePack = true;
+                    $staticMessage = i18n_t('lang.changed', $loc, ['language' => i18n_locale_native_name($loc)]);
+                    $staticSuggestions = [];
+                } else {
+                    $staticMessage = i18n_t('lang.change_prompt', $loc);
+                    $staticSuggestions = $langPickerSuggestions;
+                    $session['awaiting_other_locale'] = false;
+                    $session['awaiting_locale_confirm'] = false;
+                    // Temporarily accept select_locale mid-chat via next turn;
+                    // mark with a soft flag so free text can still pick language.
+                    $session['awaiting_language_switch'] = true;
+                }
+                $userMessage = '';
+                break;
+            }
+        }
+
+        // After "change language" with no target: treat next free text / chip as locale pick.
+        if ($userMessage !== '' && !empty($session['awaiting_language_switch'])) {
+            $validated = i18n_validate_language($userMessage);
+            $skipModel = true;
+            if (empty($validated['ok'])) {
+                $staticMessage = $validated['message'] ?? i18n_t('lang.rejected', $loc);
+                $staticSuggestions = $langPickerSuggestions;
+                $userMessage = '';
+            } else {
+                $pack = i18n_ensure_locale($validated['code'], $validated['name_en'], $validated['name_native']);
+                $session['locale'] = $pack['code'];
+                $session['locale_picked'] = true;
+                $session['awaiting_language_switch'] = false;
+                $session['awaiting_other_locale'] = false;
+                i18n_set_session_locale($pack['code']);
+                i18n_save_user_locale($userId, $pack['code']);
+                $loc = $pack['code'];
+                $refreshLocalePack = true;
+                $staticMessage = i18n_t('lang.changed', $loc, ['language' => i18n_locale_native_name($loc)]);
+                $staticSuggestions = [];
+                $userMessage = '';
+            }
+            break;
+        }
+
         if ($userMessage !== '' && ($session['mode'] === CARDY_MODE_FREECHAT || cardy_session_path($session) === CARDY_PATH_CHAT)) {
             $session['history'][] = ['role' => 'user', 'content' => $userMessage];
             $low = strtolower($userMessage);
@@ -359,15 +625,17 @@ switch ($action) {
             $skipModel = true;
             if (empty($validated['ok'])) {
                 $staticMessage = $validated['message'] ?? i18n_t('lang.rejected', $loc);
-                $staticSuggestions = $greetingSuggestions;
+                $staticSuggestions = $langPickerSuggestions;
                 $userMessage = '';
             } else {
                 $pack = i18n_ensure_locale($validated['code'], $validated['name_en'], $validated['name_native']);
                 $session['locale'] = $pack['code'];
                 $session['locale_picked'] = true;
+                $session['awaiting_locale_confirm'] = false;
                 i18n_set_session_locale($pack['code']);
                 i18n_save_user_locale($userId, $pack['code']);
                 $loc = $pack['code'];
+                $refreshLocalePack = true;
                 $staticMessage = i18n_t('lang.set', $loc);
                 $staticSuggestions = [
                     i18n_t('path.fast', $loc),
@@ -446,9 +714,10 @@ switch ($action) {
 }
 
 if (!$skipModel && $session['step'] === CARDY_STEP_GREETING && $userMessage === '' && $action === '') {
+    $greet = $cardy_soft_confirm_greeting($session, $userId, $navigatorLanguages);
     $skipModel = true;
-    $staticMessage = $greetingMessage;
-    $staticSuggestions = $greetingSuggestions;
+    $staticMessage = $greet['message'];
+    $staticSuggestions = $greet['suggestions'];
 }
 
 $memoryHints = [];
@@ -491,7 +760,11 @@ if ($injectLore) {
 }
 
 if ($skipModel) {
-    if ($staticMessage !== null) {
+    // Resume welcome-back and continue_resume should not pollute history.
+    $skipHistoryAppend = ($action === 'resume' && $resumed)
+        || $action === 'continue_resume'
+        || ($staticMessage === null || $staticMessage === '');
+    if (!$skipHistoryAppend && $staticMessage !== null) {
         $session['history'][] = ['role' => 'assistant', 'content' => $staticMessage];
         if (count($session['history']) > 16) {
             $session['history'] = array_slice($session['history'], -16);
@@ -513,6 +786,11 @@ if ($skipModel) {
         'locale' => $session['locale'] ?? $loc,
         'locale_picked' => !empty($session['locale_picked']),
         'awaiting_other_locale' => !empty($session['awaiting_other_locale']),
+        'awaiting_locale_confirm' => !empty($session['awaiting_locale_confirm']),
+        'awaiting_language_switch' => !empty($session['awaiting_language_switch']),
+        'refresh_locale_pack' => $refreshLocalePack,
+        'resumed' => $resumed,
+        'history' => $resumed ? ($session['history'] ?? []) : null,
         'message' => $staticMessage ?? '',
         'suggestions' => $staticSuggestions,
         'nickname_suggestions' => $nickSuggestions,
@@ -523,6 +801,7 @@ if ($skipModel) {
         'revise_remaining' => cardy_revise_remaining($session),
         'memory_hints' => $memoryHints,
         'image_url' => $session['image_url'] ?? null,
+        'image_b64' => $session['image_b64'] ?? null,
         'tokens' => null,
     ]);
 }
@@ -663,6 +942,10 @@ api_json([
     'locale' => $session['locale'] ?? $loc,
     'locale_picked' => !empty($session['locale_picked']),
     'awaiting_other_locale' => !empty($session['awaiting_other_locale']),
+    'awaiting_locale_confirm' => !empty($session['awaiting_locale_confirm']),
+    'awaiting_language_switch' => !empty($session['awaiting_language_switch']),
+    'refresh_locale_pack' => $refreshLocalePack,
+    'resumed' => false,
     'message' => $replyMessage,
     'suggestions' => $replySuggestions,
     'nickname_suggestions' => $nickSuggestions,
