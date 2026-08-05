@@ -232,7 +232,7 @@ body.chat-page .chat-messages.show-cardy-bg {
         <p id="confirmPanelTitle"><strong>Your card so far</strong></p>
         <p class="confirm-hint" id="confirmHint">Tweak anything, then paint.</p>
         <div class="confirm-form-extra" id="confirmFormExtra" hidden>
-          <label data-i18n="form.kind">Kind
+          <label data-i18n-label="form.kind">Kind
             <div class="confirm-kind-chips" id="confirmKindChips" aria-label="Card kind"></div>
             <input type="hidden" id="confirmType" value="">
           </label>
