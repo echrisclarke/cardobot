@@ -75,20 +75,34 @@ if (array_key_exists('show_credit', $data)) {
     $visualConcept['show_credit'] = !empty($data['show_credit']);
 }
 
-$result = save_finished_card($userId, $sessionId, [
+$saveOpts = [
     'image_url' => $imageUrl,
-    'drawing_data' => $drawingData,
-    'hue' => $hue,
-    'saturation' => $sat,
-    'lightness' => $light,
     'visual_concept' => $visualConcept,
     'art_url' => $session['art_url'] ?? $session['image_url'] ?? null,
     'stats' => $stats,
-    'back_variant' => $data['back_variant'] ?? null,
-    'back_hue' => isset($data['back_hue']) ? (int)$data['back_hue'] : null,
-    'back_saturation' => isset($data['back_saturation']) ? (int)$data['back_saturation'] : null,
-    'back_lightness' => isset($data['back_lightness']) ? (int)$data['back_lightness'] : null,
-]);
+];
+if (array_key_exists('drawing_data', $data)) {
+    $saveOpts['drawing_data'] = $drawingData;
+}
+if (array_key_exists('hue', $data)) {
+    $saveOpts['hue'] = $hue;
+}
+if (array_key_exists('saturation', $data)) {
+    $saveOpts['saturation'] = $sat;
+}
+if (array_key_exists('lightness', $data)) {
+    $saveOpts['lightness'] = $light;
+}
+if (array_key_exists('back_variant', $data)) {
+    $saveOpts['back_variant'] = $data['back_variant'];
+}
+if (array_key_exists('back_hue', $data)) {
+    $saveOpts['back_hue'] = (int)$data['back_hue'];
+    $saveOpts['back_saturation'] = isset($data['back_saturation']) ? (int)$data['back_saturation'] : 65;
+    $saveOpts['back_lightness'] = isset($data['back_lightness']) ? (int)$data['back_lightness'] : 40;
+}
+
+$result = save_finished_card($userId, $sessionId, $saveOpts);
 
 if (!$result['success']) {
     api_error('save_failed', $result['message'] ?? 'Save failed', 500);

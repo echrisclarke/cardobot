@@ -316,6 +316,9 @@ body.chat-page .chat-messages.show-cardy-bg {
     const cardobotUsername = <?php echo json_encode($cardobotUsername); ?>;
     let studio = null;
     let lastArtUrl = null;
+    let lastDrawingData = null;
+    let lastHsl = null;
+    let lastBackExtras = null;
     let lastConcept = {};
     let lastStats = null;
     let cardViewer = null;
@@ -795,7 +798,18 @@ body.chat-page .chat-messages.show-cardy-bg {
         cardViewer = new window.CardobotViewer({
             assetBase: assetBase,
             apiBase: basePath,
-            onClose: () => {},
+            onClose: (payload) => {
+                if (payload && payload.drawing) lastDrawingData = payload.drawing;
+                if (payload && payload.hsl) lastHsl = payload.hsl;
+                if (payload) {
+                    lastBackExtras = {
+                        back_variant: payload.backVariant,
+                        back_hue: payload.backHsl ? payload.backHsl.hue : undefined,
+                        back_saturation: payload.backHsl ? payload.backHsl.saturation : undefined,
+                        back_lightness: payload.backHsl ? payload.backHsl.lightness : undefined,
+                    };
+                }
+            },
             onCreditChange: (on) => {
                 lastConcept = Object.assign({}, lastConcept || {}, { show_credit: !!on });
                 if (state.visualConcept) {
@@ -813,13 +827,24 @@ body.chat-page .chat-messages.show-cardy-bg {
         if (!lastArtUrl) return;
         $studioPanel.classList.remove('visible');
         const v = ensureViewer();
-        await v.open({
+        const openPayload = {
             sessionId: state.sessionId,
             concept: conceptWithCredit(lastConcept || state.visualConcept || {}),
             stats: lastStats || {},
             artUrl: lastArtUrl,
             mode: mode === 'draw' ? 'draw' : 'viewer',
-        });
+            drawingData: lastDrawingData || null,
+            hsl: lastHsl || null,
+        };
+        if (lastBackExtras) {
+            openPayload.backVariant = lastBackExtras.back_variant;
+            openPayload.backHsl = {
+                hue: lastBackExtras.back_hue,
+                saturation: lastBackExtras.back_saturation,
+                lightness: lastBackExtras.back_lightness,
+            };
+        }
+        await v.open(openPayload);
     }
 
     function appendRevealActionsAfter(messageEl) {
@@ -1047,7 +1072,12 @@ body.chat-page .chat-messages.show-cardy-bg {
     async function handleSaveFramed(downloadOnly, studioOverride, viewer) {
         try {
             setBusy(true);
-            const s = studioOverride || await ensureStudio();
+            // Prefer the live viewer studio so we never bake an empty shared studio over ink.
+            const s = studioOverride
+                || (viewer && viewer.studio)
+                || (cardViewer && cardViewer.studio)
+                || await ensureStudio();
+            const fromViewerStudio = !!(studioOverride || (viewer && viewer.studio) || (cardViewer && cardViewer.studio));
             const concept = conceptWithCredit(lastConcept || state.visualConcept || {});
             if (viewer && viewer.studio) {
                 concept.show_credit = viewer.studio.getShowCredit();
@@ -1055,7 +1085,14 @@ body.chat-page .chat-messages.show-cardy-bg {
                 concept.show_credit = true;
             }
             await s.setConcept(concept, lastStats || {});
-            if (lastArtUrl && !studioOverride) await s.setArt(lastArtUrl);
+            if (lastArtUrl && !fromViewerStudio) await s.setArt(lastArtUrl);
+            if (!fromViewerStudio && lastDrawingData) {
+                await s.loadDrawingData(lastDrawingData);
+            }
+            if (!fromViewerStudio && lastHsl) {
+                s.setHsl(lastHsl.hue, lastHsl.saturation, lastHsl.lightness, true);
+                s.lockUserTint(true);
+            }
             let png;
             try {
                 png = await s.compositeDataUrl(2);
@@ -1064,7 +1101,10 @@ body.chat-page .chat-messages.show-cardy-bg {
                 png = await s.compositeDataUrl(2);
             }
             const hsl = s.getHsl();
-            const extras = viewer && viewer.getExtras ? viewer.getExtras() : {};
+            const drawing = s.getDrawingData();
+            const extras = (viewer && viewer.getExtras)
+                ? viewer.getExtras()
+                : (lastBackExtras || {});
             if (downloadOnly) {
                 const a = document.createElement('a');
                 a.href = png;
@@ -1073,16 +1113,29 @@ body.chat-page .chat-messages.show-cardy-bg {
                 setBusy(false);
                 return;
             }
-            const data = await postJson(basePath + '/api/export-card.php', Object.assign({
+            const body = {
                 session_id: state.sessionId,
                 composite_png: png,
-                drawing_data: s.getDrawingData(),
                 hue: hsl.hue,
                 saturation: hsl.saturation,
                 lightness: hsl.lightness,
                 stats: lastStats,
-            }, extras));
+            };
+            // Only send drawing_data when we have a real studio payload (never null wipe).
+            if (drawing) body.drawing_data = drawing;
+            Object.assign(body, extras);
+            const data = await postJson(basePath + '/api/export-card.php', body);
             state.savedCardId = data.card_id;
+            if (drawing) lastDrawingData = drawing;
+            lastHsl = hsl;
+            if (extras && (extras.back_variant != null || extras.back_hue != null)) {
+                lastBackExtras = {
+                    back_variant: extras.back_variant,
+                    back_hue: extras.back_hue,
+                    back_saturation: extras.back_saturation,
+                    back_lightness: extras.back_lightness,
+                };
+            }
             appendCardyMessage('Saved to your collection! You can view and download it anytime from your profile. *beep*', false);
             clearStaleSuggestions();
             const wrap = document.createElement('div');
@@ -1109,6 +1162,9 @@ body.chat-page .chat-messages.show-cardy-bg {
         removeImageLoading();
         state.imageElement = null;
         state.savedCardId = null;
+        lastDrawingData = null;
+        lastHsl = null;
+        lastBackExtras = null;
         state.imageTaskId = null;
         state.imageReadyHandled = false;
         state.imagePollAborted = true;

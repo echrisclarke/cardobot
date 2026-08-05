@@ -16,9 +16,10 @@
       this.assetBase = (opts && opts.assetBase) || '';
       this.layers = [];
       this.activeIndex = 0;
-      this.tool = 'brush';
+      this.tool = 'brush'; // brush | eraser | hand
       this.color = '#646464';
       this.size = 8;
+      this.opacity = 1;
       this.drawing = false;
       this.last = null;
       this.lastDir = 0;
@@ -26,6 +27,7 @@
       this.undoStacks = {};
       this.redoStacks = {};
       this.onChange = null;
+      this.onPan = null;
       this.brush = {
         id: 'hard-round',
         spacing: 0.12,
@@ -36,7 +38,9 @@
         tipImg: null,
       };
       this._tipCache = {};
+      this._tintCache = { key: '', canvas: null };
       this._enabled = true;
+      this._spacePan = false;
 
       this.stage = document.createElement('div');
       this.stage.className = 'drawing-stage';
@@ -54,9 +58,27 @@
     setEnabled(on) {
       this._enabled = !!on;
       this.stage.style.pointerEvents = on ? 'auto' : 'none';
+      this._updateCursor();
     }
 
-    _makeCanvas(name) {
+    setSpacePan(on) {
+      this._spacePan = !!on;
+      this._updateCursor();
+    }
+
+    _isPanTool() {
+      return this.tool === 'hand' || this._spacePan;
+    }
+
+    _updateCursor() {
+      if (!this._enabled) {
+        this.stage.style.cursor = 'default';
+        return;
+      }
+      this.stage.style.cursor = this._isPanTool() ? 'grab' : 'crosshair';
+    }
+
+    _makeCanvas(name, id) {
       const canvas = document.createElement('canvas');
       canvas.width = this.width;
       canvas.height = this.height;
@@ -65,7 +87,7 @@
       const ctx = canvas.getContext('2d', { willReadFrequently: true });
       ctx.lineCap = 'round';
       ctx.lineJoin = 'round';
-      return { id: uid(), name, canvas, ctx, visible: true };
+      return { id: id || uid(), name, canvas, ctx, visible: true };
     }
 
     addLayer(name) {
@@ -96,20 +118,30 @@
     }
 
     setTool(tool) {
-      this.tool = tool === 'eraser' ? 'eraser' : 'brush';
+      if (tool === 'eraser') this.tool = 'eraser';
+      else if (tool === 'hand') this.tool = 'hand';
+      else this.tool = 'brush';
+      this._updateCursor();
     }
 
     setColor(color) {
-      this.color = color;
+      this.color = color || '#646464';
+      this._tintCache.key = '';
     }
 
     setSize(size) {
       this.size = Math.max(0.5, Number(size) || 1);
     }
 
+    setOpacity(opacity) {
+      const n = Number(opacity);
+      this.opacity = Math.max(0.02, Math.min(1, Number.isFinite(n) ? n : 1));
+    }
+
     async setBrushPreset(preset, tipUrl) {
       if (!preset) return;
       this.brush = Object.assign({}, this.brush, preset);
+      this._tintCache.key = '';
       if (tipUrl) {
         this.brush.tipImg = await this._loadTip(tipUrl);
       } else if (preset.tip) {
@@ -118,18 +150,67 @@
       }
     }
 
+    _luminanceToAlpha(img) {
+      const c = document.createElement('canvas');
+      c.width = img.width || img.naturalWidth || 1;
+      c.height = img.height || img.naturalHeight || 1;
+      const ctx = c.getContext('2d');
+      ctx.drawImage(img, 0, 0);
+      const data = ctx.getImageData(0, 0, c.width, c.height);
+      const px = data.data;
+      let hasTransparency = false;
+      for (let i = 0; i < px.length; i += 4) {
+        if (px[i + 3] < 250) {
+          hasTransparency = true;
+          break;
+        }
+      }
+      if (!hasTransparency) {
+        for (let i = 0; i < px.length; i += 4) {
+          const lum = (0.299 * px[i] + 0.587 * px[i + 1] + 0.114 * px[i + 2]) / 255;
+          px[i] = 255;
+          px[i + 1] = 255;
+          px[i + 2] = 255;
+          px[i + 3] = Math.round(Math.min(1, Math.max(0, lum)) * 255);
+        }
+        ctx.putImageData(data, 0, 0);
+      }
+      return c;
+    }
+
     _loadTip(url) {
       if (this._tipCache[url]) return Promise.resolve(this._tipCache[url]);
       return new Promise((resolve) => {
         const img = new Image();
         img.crossOrigin = 'anonymous';
         img.onload = () => {
-          this._tipCache[url] = img;
-          resolve(img);
+          const tip = this._luminanceToAlpha(img);
+          this._tipCache[url] = tip;
+          resolve(tip);
         };
         img.onerror = () => resolve(null);
         img.src = url;
       });
+    }
+
+    _tintedTip() {
+      const tip = this.brush.tipImg;
+      if (!tip) return null;
+      const key = this.color + '|' + (tip.width || 0) + 'x' + (tip.height || 0);
+      if (this._tintCache.key === key && this._tintCache.canvas) {
+        return this._tintCache.canvas;
+      }
+      const off = document.createElement('canvas');
+      off.width = tip.width;
+      off.height = tip.height;
+      const octx = off.getContext('2d');
+      octx.clearRect(0, 0, off.width, off.height);
+      octx.drawImage(tip, 0, 0);
+      octx.globalCompositeOperation = 'source-in';
+      octx.fillStyle = this.color;
+      octx.fillRect(0, 0, off.width, off.height);
+      this._tintCache = { key, canvas: off };
+      return off;
     }
 
     toggleVisibility(index) {
@@ -200,9 +281,20 @@
     }
 
     _bindPointer() {
+      let panLast = null;
+
       const start = (e) => {
         if (!this._enabled) return;
         if (e.pointerType === 'touch' && e.isPrimary === false) return;
+        if (this._isPanTool()) {
+          e.stopPropagation();
+          if (e.cancelable) e.preventDefault();
+          try { this.stage.setPointerCapture(e.pointerId); } catch (_) { /* */ }
+          this.drawing = false;
+          panLast = { x: e.clientX, y: e.clientY };
+          this.stage.style.cursor = 'grabbing';
+          return;
+        }
         e.stopPropagation();
         if (e.cancelable) e.preventDefault();
         const layer = this.layers[this.activeIndex];
@@ -216,6 +308,15 @@
         this._dab(this.last);
       };
       const move = (e) => {
+        if (panLast && this._isPanTool()) {
+          e.stopPropagation();
+          if (e.cancelable) e.preventDefault();
+          const dx = e.clientX - panLast.x;
+          const dy = e.clientY - panLast.y;
+          panLast = { x: e.clientX, y: e.clientY };
+          if (typeof this.onPan === 'function') this.onPan(dx, dy);
+          return;
+        }
         if (!this.drawing) return;
         e.stopPropagation();
         if (e.cancelable) e.preventDefault();
@@ -225,6 +326,12 @@
         this.last = p;
       };
       const end = (e) => {
+        if (panLast) {
+          panLast = null;
+          this._updateCursor();
+          try { this.stage.releasePointerCapture(e.pointerId); } catch (_) { /* */ }
+          return;
+        }
         if (!this.drawing) return;
         e.stopPropagation();
         this.drawing = false;
@@ -246,7 +353,9 @@
       const dist = Math.hypot(dx, dy);
       if (dist < 0.01) return;
       this.lastDir = Math.atan2(dy, dx);
-      const spacingPx = Math.max(0.5, this.size * (this.brush.spacing || 0.15));
+      // Photoshop-like: spacing is % of stamp diameter (drawn at size*2).
+      const diameter = Math.max(1, this.size * 2);
+      const spacingPx = Math.max(0.5, diameter * (this.brush.spacing || 0.15));
       this.distAcc += dist;
       let steps = Math.floor(this.distAcc / spacingPx);
       if (steps < 1) return;
@@ -268,13 +377,14 @@
       if (!layer || !p) return;
       const ctx = layer.ctx;
       let size = this.size;
-      let alpha = this.brush.flow == null ? 1 : this.brush.flow;
+      let alpha = (this.brush.flow == null ? 1 : this.brush.flow) * this.opacity;
       if (this.brush.sizePressure) {
         size *= 0.35 + p.pressure * 0.9;
       }
       if (this.brush.opacityPressure) {
         alpha *= 0.25 + p.pressure * 0.85;
       }
+      alpha = Math.max(0.01, Math.min(1, alpha));
       ctx.save();
       if (this.tool === 'eraser') {
         ctx.globalCompositeOperation = 'destination-out';
@@ -285,25 +395,15 @@
       }
 
       if (this.brush.tipImg) {
-        const tip = this.brush.tipImg;
+        const tip = this.tool === 'eraser' ? this.brush.tipImg : this._tintedTip();
         const w = size * 2;
         const h = size * 2;
         ctx.translate(p.x, p.y);
         if (this.brush.rotateToDirection) ctx.rotate(this.lastDir);
-        if (this.tool !== 'eraser') {
-          // tint tip
-          const off = document.createElement('canvas');
-          off.width = tip.width;
-          off.height = tip.height;
-          const octx = off.getContext('2d');
-          octx.drawImage(tip, 0, 0);
-          octx.globalCompositeOperation = 'source-in';
-          octx.fillStyle = this.color;
-          octx.fillRect(0, 0, off.width, off.height);
-          ctx.drawImage(off, -w / 2, -h / 2, w, h);
-        } else {
-          ctx.drawImage(tip, -w / 2, -h / 2, w, h);
+        if (this.tool === 'eraser') {
+          ctx.globalAlpha = alpha;
         }
+        ctx.drawImage(tip, -w / 2, -h / 2, w, h);
       } else {
         ctx.beginPath();
         ctx.fillStyle = this.tool === 'eraser' ? 'rgba(0,0,0,' + alpha + ')' : this.color;
@@ -332,10 +432,48 @@
         layers: this.layers.map((l) => ({
           id: l.id,
           name: l.name,
-          visible: l.visible,
-          png: l.visible ? l.canvas.toDataURL('image/png') : null,
+          visible: !!l.visible,
+          png: l.canvas.toDataURL('image/png'),
         })),
       };
+    }
+
+    async importLayersJson(data) {
+      if (!data || !Array.isArray(data.layers) || !data.layers.length) return false;
+      this.layers.forEach((l) => l.canvas.remove());
+      this.layers = [];
+      this.undoStacks = {};
+      this.redoStacks = {};
+
+      const loadPng = (src) => new Promise((resolve) => {
+        if (!src || typeof src !== 'string') {
+          resolve(null);
+          return;
+        }
+        const img = new Image();
+        img.onload = () => resolve(img);
+        img.onerror = () => resolve(null);
+        img.src = src;
+      });
+
+      for (let i = 0; i < data.layers.length; i++) {
+        const src = data.layers[i];
+        const layer = this._makeCanvas(src.name || ('Layer ' + (i + 1)), src.id || uid());
+        layer.visible = src.visible !== false;
+        this.layers.push(layer);
+        this.stage.appendChild(layer.canvas);
+        this.undoStacks[layer.id] = [];
+        this.redoStacks[layer.id] = [];
+        const img = await loadPng(src.png);
+        if (img) {
+          layer.ctx.clearRect(0, 0, this.width, this.height);
+          layer.ctx.drawImage(img, 0, 0, this.width, this.height);
+        }
+      }
+      this.activeIndex = Math.max(0, this.layers.length - 1);
+      this._refreshPointerTargets();
+      this._emit();
+      return true;
     }
 
     exportFlattenedPng() {

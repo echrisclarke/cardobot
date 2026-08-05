@@ -4,6 +4,11 @@
 (function (global) {
   'use strict';
 
+  const SWATCHES = [
+    '#222222', '#646464', '#ffffff', '#e07e8c', '#5ed2f0',
+    '#95f5e3', '#f9bbaa', '#ffe5c0', '#7a5cff', '#3d8b40',
+  ];
+
   class CardViewer {
     constructor(opts) {
       this.assetBase = opts.assetBase || '';
@@ -11,7 +16,7 @@
       this.onClose = opts.onClose || function () {};
       this.onCreditChange = opts.onCreditChange || null;
       this.onSave = opts.onSave || null;
-      this.mode = 'viewer'; // viewer | draw
+      this.mode = 'viewer';
       this.flipped = false;
       this.tilt = { x: 0, y: 0 };
       this.scale = 1;
@@ -24,11 +29,18 @@
       this.backHue = 195;
       this.backSat = 40;
       this.backLight = 45;
+      this._frontHsl = { h: 195, s: 65, l: 40 };
+      this._backHsl = { h: 195, s: 40, l: 45 };
+      this._colorFace = 'front';
       this.brushes = [];
       this.activeBrushId = 'hard-round';
+      this.brushColor = '#646464';
+      this.brushOpacity = 1;
+      this.activeTool = 'brush';
       this.studio = null;
       this._pointers = new Map();
       this._reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      this._spaceDown = false;
       this._build();
       this._loadBrushes();
     }
@@ -44,41 +56,52 @@
           <button type="button" class="cob-app-btn primary" data-act="done">Done</button>
         </div>
         <div class="cob-stage">
+          <div class="cob-rail cob-rail-left" data-rail-left></div>
+          <div class="cob-rail cob-rail-right" data-rail-right></div>
           <div class="cob-card-viewport" data-viewport>
             <div class="cob-card-inner" data-inner>
               <div class="cob-face cob-face-front" data-front></div>
               <div class="cob-face cob-face-back" data-back>
                 <div class="cob-back-tint" data-back-tint></div>
                 <img class="cob-back-art" data-back-art alt="Card back">
+                <div class="cob-back-picker" data-back-picker></div>
               </div>
             </div>
           </div>
-          <div class="cob-sheet" data-sheet-color>
-            <h3>Color</h3>
+          <div class="cob-hud" data-hud>
+            <label>Size <input type="range" min="1" max="48" value="8" data-brush-size><span data-size-val>8</span></label>
+            <label>Opacity <input type="range" min="5" max="100" value="100" data-brush-opacity><span data-opacity-val>100%</span></label>
+          </div>
+          <div class="cob-popover cob-popover-color" data-popover-color>
+            <div class="cob-swatches" data-swatches></div>
+            <label class="cob-color-wheel-wrap">
+              <input type="color" value="#646464" data-brush-color>
+            </label>
+            <button type="button" class="cob-app-btn" data-act="close-popovers">Close</button>
+          </div>
+          <div class="cob-sheet cob-panel" data-sheet-color>
+            <h3>Card tint</h3>
             <label>Face
               <select data-color-face>
-                <option value="front">Front tint</option>
-                <option value="back">Back tint</option>
+                <option value="front">Front</option>
+                <option value="back">Back</option>
               </select>
             </label>
             <label>Hue <input type="range" min="0" max="360" value="195" data-hue></label>
             <label>Sat <input type="range" min="0" max="100" value="65" data-sat></label>
             <label>Light <input type="range" min="0" max="100" value="40" data-light></label>
-            <label data-back-style-wrap>Back style
-              <select data-back-style></select>
-            </label>
             <label class="cob-check">
               <input type="checkbox" data-show-credit checked>
               Show username on card
             </label>
             <button type="button" class="cob-app-btn" data-act="close-sheet">Close</button>
           </div>
-          <div class="cob-sheet" data-sheet-brushes>
-            <h3>Brushes</h3>
+          <div class="cob-sheet cob-panel" data-sheet-brushes>
+            <h3>Tips</h3>
             <div class="cob-brush-grid" data-brush-grid></div>
             <button type="button" class="cob-app-btn" data-act="close-sheet">Close</button>
           </div>
-          <div class="cob-sheet" data-sheet-layers>
+          <div class="cob-sheet cob-panel" data-sheet-layers>
             <h3>Layers</h3>
             <div data-layer-list></div>
             <div class="cob-layer-row">
@@ -91,7 +114,6 @@
         </div>
         <div class="cob-dock" data-dock></div>
       `;
-      // Stay inside the physical console screen, not a separate phone chrome.
       const screen = document.querySelector('.console-screen');
       (screen || document.body).appendChild(this.el);
       if (!screen) this.el.classList.add('cob-app-shell--fallback');
@@ -101,21 +123,20 @@
       this.front = this.el.querySelector('[data-front]');
       this.backArt = this.el.querySelector('[data-back-art]');
       this.backTint = this.el.querySelector('[data-back-tint]');
+      this.backPicker = this.el.querySelector('[data-back-picker]');
       this.titleEl = this.el.querySelector('[data-title]');
       this.statusEl = this.el.querySelector('[data-status]');
       this.dock = this.el.querySelector('[data-dock]');
+      this.railLeft = this.el.querySelector('[data-rail-left]');
+      this.railRight = this.el.querySelector('[data-rail-right]');
+      this.hud = this.el.querySelector('[data-hud]');
+      this.popoverColor = this.el.querySelector('[data-popover-color]');
       this.sheetColor = this.el.querySelector('[data-sheet-color]');
       this.sheetBrushes = this.el.querySelector('[data-sheet-brushes]');
       this.sheetLayers = this.el.querySelector('[data-sheet-layers]');
 
-      const backs = (global.CardobotLayout && global.CardobotLayout.BACKS) || [];
-      const sel = this.el.querySelector('[data-back-style]');
-      backs.forEach((b, i) => {
-        const opt = document.createElement('option');
-        opt.value = String(i);
-        opt.textContent = 'Back ' + (i + 1);
-        sel.appendChild(opt);
-      });
+      this._renderBackPicker();
+      this._renderSwatches();
 
       this.el.addEventListener('click', (e) => {
         const act = e.target.closest('[data-act]');
@@ -123,17 +144,90 @@
         this._action(act.getAttribute('data-act'));
       });
 
-      this.el.querySelectorAll('[data-hue],[data-sat],[data-light],[data-color-face],[data-back-style]').forEach((el) => {
-        el.addEventListener('input', () => this._onColorInput());
-        el.addEventListener('change', () => this._onColorInput());
+      this.el.querySelectorAll('[data-hue],[data-sat],[data-light]').forEach((el) => {
+        el.addEventListener('input', () => this._onColorInput(false));
+        el.addEventListener('change', () => this._onColorInput(false));
       });
+      const faceSel = this.el.querySelector('[data-color-face]');
+      if (faceSel) {
+        faceSel.addEventListener('change', () => this._onFaceSelect());
+      }
       const creditToggle = this.el.querySelector('[data-show-credit]');
       if (creditToggle) {
         creditToggle.addEventListener('change', () => this._onCreditToggle());
       }
 
+      const sizeEl = this.el.querySelector('[data-brush-size]');
+      const opacityEl = this.el.querySelector('[data-brush-opacity]');
+      const brushColorEl = this.el.querySelector('[data-brush-color]');
+      if (sizeEl) {
+        sizeEl.addEventListener('input', () => {
+          const v = +sizeEl.value;
+          this.el.querySelector('[data-size-val]').textContent = String(v);
+          const eng = this.studio && this.studio.getEngine();
+          if (eng) eng.setSize(v);
+        });
+      }
+      if (opacityEl) {
+        opacityEl.addEventListener('input', () => {
+          const v = +opacityEl.value;
+          this.brushOpacity = v / 100;
+          this.el.querySelector('[data-opacity-val]').textContent = v + '%';
+          const eng = this.studio && this.studio.getEngine();
+          if (eng) eng.setOpacity(this.brushOpacity);
+        });
+      }
+      if (brushColorEl) {
+        brushColorEl.addEventListener('input', () => {
+          this._setBrushColor(brushColorEl.value);
+        });
+      }
+
       this._bindGestures();
-      this._renderDock();
+      this._renderChrome();
+    }
+
+    _renderBackPicker() {
+      const backs = (global.CardobotLayout && global.CardobotLayout.BACKS) || [];
+      this.backPicker.innerHTML = backs.map((file, i) =>
+        `<button type="button" class="cob-back-thumb${i === this.backVariant ? ' active' : ''}" data-back-idx="${i}" title="Back ${i + 1}">
+          <img src="${this.assetBase}/assets/img/cardbacks/${file}" alt="">
+        </button>`
+      ).join('');
+      this.backPicker.querySelectorAll('[data-back-idx]').forEach((btn) => {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          this._setBackVariant(+btn.getAttribute('data-back-idx'));
+        });
+      });
+    }
+
+    _setBackVariant(idx) {
+      const backs = (global.CardobotLayout && global.CardobotLayout.BACKS) || [];
+      if (!backs.length) return;
+      this.backVariant = ((idx % backs.length) + backs.length) % backs.length;
+      this.backArt.src = this.assetBase + '/assets/img/cardbacks/' + backs[this.backVariant];
+      this.backPicker.querySelectorAll('.cob-back-thumb').forEach((el, i) => {
+        el.classList.toggle('active', i === this.backVariant);
+      });
+    }
+
+    _renderSwatches() {
+      const wrap = this.el.querySelector('[data-swatches]');
+      wrap.innerHTML = SWATCHES.map((c) =>
+        `<button type="button" class="cob-swatch" data-swatch="${c}" style="background:${c}" aria-label="${c}"></button>`
+      ).join('');
+      wrap.querySelectorAll('[data-swatch]').forEach((btn) => {
+        btn.addEventListener('click', () => this._setBrushColor(btn.getAttribute('data-swatch')));
+      });
+    }
+
+    _setBrushColor(color) {
+      this.brushColor = color;
+      const input = this.el.querySelector('[data-brush-color]');
+      if (input) input.value = color;
+      const eng = this.studio && this.studio.getEngine();
+      if (eng) eng.setColor(color);
     }
 
     async _loadBrushes() {
@@ -166,46 +260,80 @@
       const eng = this.studio && this.studio.getEngine();
       if (eng) {
         await eng.setBrushPreset(b, this.assetBase + '/assets/brushes/' + b.tip);
-        if (b.baseSize) eng.setSize(b.baseSize);
+        if (b.baseSize) {
+          eng.setSize(b.baseSize);
+          const sizeEl = this.el.querySelector('[data-brush-size]');
+          if (sizeEl) {
+            sizeEl.value = String(Math.round(b.baseSize));
+            this.el.querySelector('[data-size-val]').textContent = String(Math.round(b.baseSize));
+          }
+        }
+        eng.setColor(this.brushColor);
+        eng.setOpacity(this.brushOpacity);
       }
-      if (this.statusEl) this.statusEl.textContent = b.name;
       this._closeSheets();
     }
 
-    _renderDock() {
+    _iconBtn(id, ico, title) {
+      return `<button type="button" class="cob-tool-btn" data-dock="${id}" title="${title}" aria-label="${title}"><span class="ico">${ico}</span></button>`;
+    }
+
+    _renderChrome() {
       const draw = this.mode === 'draw';
-      // Short labels: Press Start 2P is wide and must fit the console dock.
-      const items = draw
-        ? [
-            ['brush', 'Ink', '✎'],
-            ['eraser', 'Erase', '⌫'],
-            ['brushes', 'Tips', '◇'],
-            ['size', 'Size', '◎'],
-            ['undo', 'Undo', '↶'],
-            ['redo', 'Redo', '↷'],
-            ['layers', 'Layer', '☰'],
-            ['color', 'Tint', '◐'],
-            ['zoomout', 'Out', '−'],
-            ['zoomin', 'In', '+'],
-            ['resetzoom', '1:1', '⤢'],
-          ]
-        : [
-            ['flip', 'Flip', '↻'],
-            ['draw', 'Draw', '✎'],
-            ['color', 'Tint', '◐'],
-            ['save', 'Save', '↓'],
-            ['download', 'Get', '⇪'],
-          ];
-      this.dock.innerHTML = items.map(([id, label, ico]) =>
-        `<button type="button" class="cob-dock-btn" data-dock="${id}"><span class="ico">${ico}</span>${label}</button>`
-      ).join('');
-      this.dock.querySelectorAll('[data-dock]').forEach((btn) => {
+      this.el.classList.toggle('is-draw-mode', draw);
+      this.el.classList.toggle('is-viewer-mode', !draw);
+      this.el.classList.toggle('is-flipped', this.flipped);
+
+      if (draw) {
+        this.railLeft.innerHTML = [
+          this._iconBtn('brush', '✎', 'Brush'),
+          this._iconBtn('eraser', '⌫', 'Eraser'),
+          this._iconBtn('hand', '✋', 'Hand'),
+          this._iconBtn('brushes', '◇', 'Tips'),
+          this._iconBtn('inkcolor', '◉', 'Ink color'),
+          this._iconBtn('hud', '◎', 'Size / opacity'),
+          this._iconBtn('undo', '↶', 'Undo'),
+          this._iconBtn('redo', '↷', 'Redo'),
+          this._iconBtn('zoomout', '−', 'Zoom out'),
+          this._iconBtn('zoomin', '+', 'Zoom in'),
+          this._iconBtn('resetzoom', '⤢', 'Fit'),
+        ].join('');
+        this.railRight.innerHTML = [
+          this._iconBtn('layers', '☰', 'Layers'),
+          this._iconBtn('tint', '◐', 'Card tint'),
+        ].join('');
+        this.dock.innerHTML = '';
+      } else {
+        this.railLeft.innerHTML = '';
+        this.railRight.innerHTML = '';
+        this.dock.innerHTML = [
+          this._iconBtn('flip', '↻', 'Flip'),
+          this._iconBtn('draw', '✎', 'Draw'),
+          this._iconBtn('tint', '◐', 'Card tint'),
+          this._iconBtn('save', '↓', 'Save'),
+          this._iconBtn('download', '⇪', 'Download'),
+        ].join('');
+      }
+
+      this.el.querySelectorAll('[data-dock]').forEach((btn) => {
         btn.addEventListener('click', () => this._dock(btn.getAttribute('data-dock')));
+      });
+      this._syncToolActive();
+      this.hud.classList.toggle('open', draw && this.hud.classList.contains('pinned'));
+    }
+
+    _syncToolActive() {
+      this.el.querySelectorAll('[data-dock]').forEach((btn) => {
+        const id = btn.getAttribute('data-dock');
+        const on = (id === this.activeTool)
+          || (id === 'brush' && this.activeTool === 'brush')
+          || (id === 'eraser' && this.activeTool === 'eraser')
+          || (id === 'hand' && this.activeTool === 'hand');
+        btn.classList.toggle('active', on && (id === 'brush' || id === 'eraser' || id === 'hand'));
       });
     }
 
     async open(payload) {
-      // Always host inside the device screen (never a separate fullscreen phone shell).
       const screen = document.querySelector('.console-screen');
       if (screen && this.el.parentNode !== screen) {
         screen.appendChild(this.el);
@@ -220,6 +348,15 @@
       this.flipped = false;
       this.scale = 1;
       this.pan = { x: 0, y: 0 };
+      this.activeTool = 'brush';
+
+      if (payload.backVariant != null) this.backVariant = +payload.backVariant || 0;
+      if (payload.backHsl) {
+        this.backHue = +payload.backHsl.hue || this.backHue;
+        this.backSat = +payload.backHsl.saturation || this.backSat;
+        this.backLight = +payload.backHsl.lightness || this.backLight;
+      }
+      this._backHsl = { h: this.backHue, s: this.backSat, l: this.backLight };
 
       this.front.innerHTML = '';
       this.studio = null;
@@ -241,14 +378,22 @@
         });
         await this.studio.setConcept(this.concept, this.stats);
         if (this.artUrl) await this.studio.setArt(this.artUrl);
+        if (payload.hsl && Number.isFinite(+payload.hsl.hue)) {
+          this.studio.setHsl(+payload.hsl.hue, +payload.hsl.saturation, +payload.hsl.lightness, true);
+          this.studio.lockUserTint(true);
+        }
+        if (payload.drawingData) {
+          await this.studio.loadDrawingData(payload.drawingData);
+        }
+        this._wireEnginePan();
         this._syncColorSlidersFromStudio();
         this._syncCreditToggle();
+        this._setBrushColor(this.brushColor);
+        const eng = this.studio.getEngine();
+        if (eng) eng.setOpacity(this.brushOpacity);
       }
 
-      const backs = (global.CardobotLayout && global.CardobotLayout.BACKS) || [];
-      if (backs.length) {
-        this.backArt.src = this.assetBase + '/assets/img/cardbacks/' + backs[this.backVariant % backs.length];
-      }
+      this._setBackVariant(this.backVariant);
       this._applyBackTint();
       this._applyTransform();
 
@@ -257,21 +402,33 @@
       this._setMode(this.mode);
     }
 
+    _wireEnginePan() {
+      const eng = this.studio && this.studio.getEngine();
+      if (!eng) return;
+      eng.onPan = (dx, dy) => {
+        this.pan.x += dx;
+        this.pan.y += dy;
+        this._applyTransform();
+      };
+    }
+
     close() {
       this.el.classList.remove('open');
       document.body.classList.remove('cob-app-open');
       this._closeSheets();
+      this._closePopovers();
       this.onClose({
         sessionId: this.sessionId,
         drawing: this.studio ? this.studio.getDrawingData() : null,
         hsl: this.studio ? this.studio.getHsl() : null,
+        backVariant: this.backVariant,
+        backHsl: { hue: this.backHue, saturation: this.backSat, lightness: this.backLight },
       });
     }
 
     _setMode(mode) {
       this.mode = mode;
       this.titleEl.textContent = mode === 'draw' ? 'INK DECK' : 'CARD VIEWER';
-      this._renderDock();
       if (this.studio) {
         this.studio.setDrawingEnabled(mode === 'draw');
       }
@@ -281,13 +438,19 @@
         this.viewport.classList.remove('flipped');
         this.tilt = { x: 0, y: 0 };
         this._pointers.clear();
-        this.statusEl.textContent = '';
+        this.activeTool = 'brush';
+        const eng = this.studio && this.studio.getEngine();
+        if (eng) eng.setTool('brush');
         const b = this.brushes.find((x) => x.id === this.activeBrushId) || this.brushes[0];
         if (b) this._selectBrush(b);
-      } else {
-        this.statusEl.textContent = '';
       }
+      this._renderChrome();
       this._applyTransform();
+      this._updateBackPickerVisibility();
+    }
+
+    _updateBackPickerVisibility() {
+      this.backPicker.classList.toggle('open', this.mode === 'viewer' && this.flipped);
     }
 
     _action(act) {
@@ -302,6 +465,10 @@
       }
       if (act === 'close-sheet') {
         this._closeSheets();
+        return;
+      }
+      if (act === 'close-popovers') {
+        this._closePopovers();
         return;
       }
       if (act === 'new-layer') {
@@ -326,13 +493,15 @@
         if (this.mode === 'draw') return;
         this.flipped = !this.flipped;
         this.viewport.classList.toggle('flipped', this.flipped);
+        this.el.classList.toggle('is-flipped', this.flipped);
+        this._updateBackPickerVisibility();
         return;
       }
       if (id === 'draw') {
         this._setMode('draw');
         return;
       }
-      if (id === 'color') {
+      if (id === 'color' || id === 'tint') {
         this._openSheet(this.sheetColor);
         return;
       }
@@ -345,14 +514,31 @@
         this._openSheet(this.sheetLayers);
         return;
       }
+      if (id === 'inkcolor') {
+        this.popoverColor.classList.toggle('open');
+        return;
+      }
+      if (id === 'hud') {
+        this.hud.classList.toggle('pinned');
+        this.hud.classList.toggle('open', this.hud.classList.contains('pinned'));
+        return;
+      }
       if (id === 'brush' && eng) {
+        this.activeTool = 'brush';
         eng.setTool('brush');
-        this.statusEl.textContent = 'Brush';
+        this._syncToolActive();
         return;
       }
       if (id === 'eraser' && eng) {
+        this.activeTool = 'eraser';
         eng.setTool('eraser');
-        this.statusEl.textContent = 'Eraser';
+        this._syncToolActive();
+        return;
+      }
+      if (id === 'hand' && eng) {
+        this.activeTool = 'hand';
+        eng.setTool('hand');
+        this._syncToolActive();
         return;
       }
       if (id === 'undo' && eng) { eng.undo(); return; }
@@ -360,30 +546,28 @@
       if (id === 'zoomin') { this.scale = Math.min(3.5, this.scale * 1.2); this._applyTransform(); return; }
       if (id === 'zoomout') { this.scale = Math.max(0.6, this.scale / 1.2); this._applyTransform(); return; }
       if (id === 'resetzoom') { this.scale = 1; this.pan = { x: 0, y: 0 }; this._applyTransform(); return; }
-      if (id === 'size' && eng) {
-        const next = eng.size >= 28 ? 4 : eng.size + 4;
-        eng.setSize(next);
-        this.statusEl.textContent = 'Size ' + Math.round(next);
-        return;
-      }
       if (id === 'save' && typeof this.onSave === 'function') {
         await this.onSave({ download: false, studio: this.studio, sessionId: this.sessionId, viewer: this });
-        this.statusEl.textContent = 'Saved to collection';
+        if (this.statusEl) this.statusEl.textContent = 'Saved';
         return;
       }
       if (id === 'download' && typeof this.onSave === 'function') {
         await this.onSave({ download: true, studio: this.studio, sessionId: this.sessionId, viewer: this });
-        this.statusEl.textContent = 'Download ready';
       }
     }
 
     _openSheet(sheet) {
       this._closeSheets();
+      this._closePopovers();
       sheet.classList.add('open');
     }
 
     _closeSheets() {
       [this.sheetColor, this.sheetBrushes, this.sheetLayers].forEach((s) => s.classList.remove('open'));
+    }
+
+    _closePopovers() {
+      this.popoverColor.classList.remove('open');
     }
 
     _renderLayers() {
@@ -402,17 +586,42 @@
       });
     }
 
+    _stashCurrentFaceSliders() {
+      const h = +this.el.querySelector('[data-hue]').value;
+      const s = +this.el.querySelector('[data-sat]').value;
+      const l = +this.el.querySelector('[data-light]').value;
+      if (this._colorFace === 'front') {
+        this._frontHsl = { h, s, l };
+      } else {
+        this._backHsl = { h, s, l };
+        this.backHue = h;
+        this.backSat = s;
+        this.backLight = l;
+      }
+    }
+
+    _applySlidersFromFace(face) {
+      const src = face === 'back' ? this._backHsl : this._frontHsl;
+      this.el.querySelector('[data-hue]').value = String(src.h);
+      this.el.querySelector('[data-sat]').value = String(src.s);
+      this.el.querySelector('[data-light]').value = String(src.l);
+    }
+
+    _onFaceSelect() {
+      this._stashCurrentFaceSliders();
+      const face = this.el.querySelector('[data-color-face]').value;
+      this._colorFace = face;
+      this._applySlidersFromFace(face);
+    }
+
     _syncColorSlidersFromStudio() {
       if (!this.studio) return;
       const hsl = this.studio.getHsl();
-      const hue = this.el.querySelector('[data-hue]');
-      const sat = this.el.querySelector('[data-sat]');
-      const light = this.el.querySelector('[data-light]');
+      this._frontHsl = { h: hsl.hue, s: hsl.saturation, l: hsl.lightness };
+      this._colorFace = 'front';
       const face = this.el.querySelector('[data-color-face]');
       if (face) face.value = 'front';
-      if (hue) hue.value = String(hsl.hue);
-      if (sat) sat.value = String(hsl.saturation);
-      if (light) light.value = String(hsl.lightness);
+      this._applySlidersFromFace('front');
     }
 
     _syncCreditToggle() {
@@ -435,24 +644,19 @@
 
     _onColorInput() {
       const face = this.el.querySelector('[data-color-face]').value;
+      this._colorFace = face;
       const h = +this.el.querySelector('[data-hue]').value;
       const s = +this.el.querySelector('[data-sat]').value;
       const l = +this.el.querySelector('[data-light]').value;
       if (face === 'front' && this.studio) {
+        this._frontHsl = { h, s, l };
         this.studio.setHsl(h, s, l, true);
       } else {
+        this._backHsl = { h, s, l };
         this.backHue = h;
         this.backSat = s;
         this.backLight = l;
         this._applyBackTint();
-      }
-      const style = this.el.querySelector('[data-back-style]');
-      if (style) {
-        this.backVariant = +style.value || 0;
-        const backs = (global.CardobotLayout && global.CardobotLayout.BACKS) || [];
-        if (backs.length) {
-          this.backArt.src = this.assetBase + '/assets/img/cardbacks/' + backs[this.backVariant % backs.length];
-        }
       }
     }
 
@@ -471,29 +675,40 @@
       let dragging = false;
       let last = null;
       let pinchStart = null;
+      const stage = this.el.querySelector('.cob-stage');
 
-      this.viewport.addEventListener('pointerdown', (e) => {
-        // Ink deck owns all pointers; never capture or tilt/grab here.
-        if (this.mode === 'draw') return;
-        this.viewport.setPointerCapture(e.pointerId);
+      // Capture phase so pinch works even when the drawing stage stops propagation.
+      const onDown = (e) => {
         this._pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+        const onInk = !!(e.target.closest && e.target.closest('.drawing-stage'));
+        const panMode = this.activeTool === 'hand' || this._spaceDown;
+        if (this.mode === 'draw' && onInk && !panMode) {
+          // Let the engine paint; still track pointers for pinch.
+          if (this._pointers.size >= 2) {
+            const eng = this.studio && this.studio.getEngine();
+            if (eng) eng.drawing = false;
+          }
+          return;
+        }
+        try { this.viewport.setPointerCapture(e.pointerId); } catch (_) { /* */ }
         if (this._pointers.size === 1) {
           dragging = true;
           last = { x: e.clientX, y: e.clientY };
         }
-      });
+      };
 
-      this.viewport.addEventListener('pointermove', (e) => {
-        if (this.mode === 'draw') return;
+      const onMove = (e) => {
         if (!this._pointers.has(e.pointerId)) return;
         this._pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
 
         if (this._pointers.size === 2) {
+          const eng = this.studio && this.studio.getEngine();
+          if (eng) eng.drawing = false;
           const pts = [...this._pointers.values()];
           const dist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
           const mid = { x: (pts[0].x + pts[1].x) / 2, y: (pts[0].y + pts[1].y) / 2 };
           if (!pinchStart) pinchStart = { dist, mid, scale: this.scale, pan: { ...this.pan } };
-          else {
+          else if (pinchStart.dist > 0) {
             this.scale = Math.min(3.5, Math.max(0.6, pinchStart.scale * (dist / pinchStart.dist)));
             this.pan.x = pinchStart.pan.x + (mid.x - pinchStart.mid.x);
             this.pan.y = pinchStart.pan.y + (mid.y - pinchStart.mid.y);
@@ -506,51 +721,104 @@
         const dx = e.clientX - last.x;
         const dy = e.clientY - last.y;
         last = { x: e.clientX, y: e.clientY };
+        if (this.mode === 'draw' || this.activeTool === 'hand' || this._spaceDown) {
+          this.pan.x += dx;
+          this.pan.y += dy;
+          this._applyTransform();
+          return;
+        }
         if (!this._reduced) {
           this.tilt.y = Math.max(-12, Math.min(12, this.tilt.y + dx * 0.08));
           this.tilt.x = Math.max(-10, Math.min(10, this.tilt.x - dy * 0.08));
           this._applyTransform();
         }
-      });
+      };
 
       const end = (e) => {
-        if (this.mode === 'draw') {
-          this._pointers.clear();
-          dragging = false;
-          last = null;
-          pinchStart = null;
-          return;
-        }
         this._pointers.delete(e.pointerId);
         if (this._pointers.size < 2) pinchStart = null;
         if (this._pointers.size === 0) {
           dragging = false;
           last = null;
-          if (!this._reduced) {
+          if (this.mode !== 'draw' && !this._reduced) {
             this.tilt = { x: 0, y: 0 };
             this._applyTransform();
           }
         }
       };
-      this.viewport.addEventListener('pointerup', end);
-      this.viewport.addEventListener('pointercancel', end);
 
-      this.viewport.addEventListener('click', (e) => {
-        if (this.mode === 'draw') return;
-        if (Math.abs(this.tilt.x) + Math.abs(this.tilt.y) > 2) return;
-        // ignore if came from dock
-        if (e.target.closest('.cob-dock')) return;
-      });
+      stage.addEventListener('pointerdown', onDown, true);
+      stage.addEventListener('pointermove', onMove, true);
+      stage.addEventListener('pointerup', end, true);
+      stage.addEventListener('pointercancel', end, true);
 
       window.addEventListener('keydown', (e) => {
         if (!this.el.classList.contains('open')) return;
-        if (e.code === 'Space' || e.code === 'Enter') {
-          if (this.mode !== 'draw') {
+        const mod = e.ctrlKey || e.metaKey;
+        const eng = this.studio && this.studio.getEngine();
+
+        if (e.code === 'Space') {
+          if (this.mode === 'draw') {
             e.preventDefault();
-            this._dock('flip');
+            this._spaceDown = true;
+            if (eng) eng.setSpacePan(true);
+            return;
+          }
+          e.preventDefault();
+          this._dock('flip');
+          return;
+        }
+        if (e.code === 'Enter' && this.mode !== 'draw') {
+          e.preventDefault();
+          this._dock('flip');
+          return;
+        }
+        if (e.key === 'Escape') {
+          if (this.sheetColor.classList.contains('open')
+            || this.sheetBrushes.classList.contains('open')
+            || this.sheetLayers.classList.contains('open')
+            || this.popoverColor.classList.contains('open')) {
+            this._closeSheets();
+            this._closePopovers();
+            return;
+          }
+          this.close();
+          return;
+        }
+        if (mod && (e.key === 'z' || e.key === 'Z')) {
+          if (!eng || this.mode !== 'draw') return;
+          e.preventDefault();
+          if (e.shiftKey) eng.redo();
+          else eng.undo();
+          return;
+        }
+        if (mod && (e.key === 'y' || e.key === 'Y')) {
+          if (!eng || this.mode !== 'draw') return;
+          e.preventDefault();
+          eng.redo();
+          return;
+        }
+        if (this.mode === 'draw' && (e.key === '[' || e.key === ']')) {
+          if (!eng) return;
+          e.preventDefault();
+          const delta = e.key === ']' ? 2 : -2;
+          const next = Math.max(1, Math.min(48, eng.size + delta));
+          eng.setSize(next);
+          const sizeEl = this.el.querySelector('[data-brush-size]');
+          if (sizeEl) {
+            sizeEl.value = String(Math.round(next));
+            this.el.querySelector('[data-size-val]').textContent = String(Math.round(next));
           }
         }
-        if (e.key === 'Escape') this.close();
+      });
+
+      window.addEventListener('keyup', (e) => {
+        if (!this.el.classList.contains('open')) return;
+        if (e.code === 'Space') {
+          this._spaceDown = false;
+          const eng = this.studio && this.studio.getEngine();
+          if (eng) eng.setSpacePan(false);
+        }
       });
     }
 

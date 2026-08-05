@@ -154,26 +154,50 @@ function save_finished_card(int $userId, string $sessionId, array $opts): array 
     } else {
         $ability = $abilityName !== '' ? $abilityName : $abilityLine;
     }
-    $drawing = $opts['drawing_data'] ?? null;
-    if (is_array($drawing)) {
-        $drawing = json_encode($drawing);
+    // Load prior row so omitted drawing/HSL/attrs do not wipe saved ink.
+    $existing = null;
+    try {
+        $ex = $pdo->prepare('SELECT drawing_data, hue, saturation, lightness, attributes_json FROM cardobot_cards WHERE user_id = ? AND card_id = ? LIMIT 1');
+        $ex->execute([$userId, $sessionId]);
+        $existing = $ex->fetch(PDO::FETCH_ASSOC) ?: null;
+    } catch (PDOException $e) {
+        $existing = null;
     }
 
-    $hue = isset($opts['hue']) ? (int)$opts['hue'] : null;
-    $sat = isset($opts['saturation']) ? (int)$opts['saturation'] : null;
-    $light = isset($opts['lightness']) ? (int)$opts['lightness'] : null;
+    $hasDrawing = array_key_exists('drawing_data', $opts);
+    $drawing = $hasDrawing ? ($opts['drawing_data'] ?? null) : null;
+    if ($hasDrawing && is_array($drawing)) {
+        $drawing = json_encode($drawing);
+    }
+    if (!$hasDrawing && $existing && array_key_exists('drawing_data', $existing)) {
+        $drawing = $existing['drawing_data'];
+    }
 
-    $attrs = $visualConcept;
+    $hasHue = array_key_exists('hue', $opts);
+    $hasSat = array_key_exists('saturation', $opts);
+    $hasLight = array_key_exists('lightness', $opts);
+    $hue = $hasHue ? (int)$opts['hue'] : ($existing ? ($existing['hue'] !== null ? (int)$existing['hue'] : null) : null);
+    $sat = $hasSat ? (int)$opts['saturation'] : ($existing ? ($existing['saturation'] !== null ? (int)$existing['saturation'] : null) : null);
+    $light = $hasLight ? (int)$opts['lightness'] : ($existing ? ($existing['lightness'] !== null ? (int)$existing['lightness'] : null) : null);
+
+    $prevAttrs = [];
+    if ($existing && !empty($existing['attributes_json'])) {
+        $decoded = json_decode((string)$existing['attributes_json'], true);
+        if (is_array($decoded)) {
+            $prevAttrs = $decoded;
+        }
+    }
+    $attrs = array_merge($prevAttrs, $visualConcept);
     if (!empty($opts['art_url'])) {
         $attrs['art_url'] = $opts['art_url'];
     }
-    if (!empty($opts['back_variant'])) {
-        $attrs['back_variant'] = $opts['back_variant'];
+    if (array_key_exists('back_variant', $opts) && $opts['back_variant'] !== null && $opts['back_variant'] !== '') {
+        $attrs['back_variant'] = (int)$opts['back_variant'];
     }
-    if (isset($opts['back_hue'])) {
+    if (array_key_exists('back_hue', $opts) && $opts['back_hue'] !== null) {
         $attrs['back_hue'] = (int)$opts['back_hue'];
-        $attrs['back_saturation'] = (int)($opts['back_saturation'] ?? 65);
-        $attrs['back_lightness'] = (int)($opts['back_lightness'] ?? 40);
+        $attrs['back_saturation'] = (int)($opts['back_saturation'] ?? ($attrs['back_saturation'] ?? 65));
+        $attrs['back_lightness'] = (int)($opts['back_lightness'] ?? ($attrs['back_lightness'] ?? 40));
     }
 
     $stats = is_array($opts['stats'] ?? null) ? $opts['stats'] : [];

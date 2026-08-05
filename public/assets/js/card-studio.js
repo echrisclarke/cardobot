@@ -403,8 +403,10 @@
     }
 
     _applyHsl() {
+      // Keep preview close to export: solid fill + texture at fixed alpha (no CSS hue filters).
       this.colorFill.style.background = `hsl(${this.hue} ${this.saturation}% ${this.lightness}%)`;
-      this.bgImg.style.filter = `hue-rotate(${this.hue - 195}deg) saturate(${this.saturation / 65}) brightness(${0.7 + this.lightness / 200})`;
+      this.bgImg.style.filter = 'none';
+      this.bgImg.style.opacity = '0.85';
     }
 
     setHsl(h, s, l, fromUser) {
@@ -413,6 +415,10 @@
       this.lightness = l;
       if (fromUser) this._userTintLocked = true;
       this._applyHsl();
+    }
+
+    lockUserTint(on) {
+      this._userTintLocked = !!on;
     }
 
     async setConcept(concept, stats) {
@@ -475,10 +481,6 @@
         const hsl = this._resolveBgHsl(concept);
         if (hsl) this.setHsl(hsl.h, hsl.s, hsl.l);
       }
-    }
-
-    lockUserTint(on) {
-      this._userTintLocked = !!on;
     }
 
     setShowCredit(on) {
@@ -600,6 +602,18 @@
         });
         this.engine.setEnabled(false);
       }
+    }
+
+    async loadDrawingData(data) {
+      if (!data) return false;
+      const art = L().ART_STUDIO;
+      if (!this.engine) {
+        this.engine = new global.CardobotDrawingEngine(this.drawHost, art.w, art.h, {
+          assetBase: this.assetBase,
+        });
+        this.engine.setEnabled(false);
+      }
+      return this.engine.importLayersJson(data);
     }
 
     setDrawingEnabled(on) {

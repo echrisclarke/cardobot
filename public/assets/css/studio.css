@@ -49,8 +49,8 @@
 
 .studio-card-bg {
   z-index: 1;
-  opacity: 0.9;
-  mix-blend-mode: multiply;
+  opacity: 0.85;
+  mix-blend-mode: normal;
 }
 
 .studio-art-wrap {
