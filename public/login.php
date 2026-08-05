@@ -5,6 +5,7 @@
 
 require_once __DIR__ . '/includes/auth.php';
 auth_boot(true);
+cardobot_ensure_test_user();
 
 $basePath = get_base_path();
 

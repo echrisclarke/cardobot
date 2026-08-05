@@ -485,6 +485,77 @@ function authenticate_user(string $username, string $password): array {
 }
 
 /**
+ * Dedicated pipeline test account (always starts a fresh Cardy session on login).
+ */
+function cardobot_test_username(): string {
+    require_once __DIR__ . '/env.php';
+    $env = load_env();
+    $name = trim((string)($env['TEST_USERNAME'] ?? ''));
+    return $name !== '' ? $name : 'test';
+}
+
+function cardobot_test_password(): string {
+    require_once __DIR__ . '/env.php';
+    $env = load_env();
+    $pass = (string)($env['TEST_PASSWORD'] ?? '');
+    return $pass !== '' ? $pass : 'test1234';
+}
+
+function cardobot_is_test_user(string $username): bool {
+    return strcasecmp(trim($username), cardobot_test_username()) === 0;
+}
+
+/**
+ * Ensure the always-fresh test account exists and password stays known.
+ */
+function cardobot_ensure_test_user(): void {
+    $username = cardobot_test_username();
+    $password = cardobot_test_password();
+    if ($username === '' || !is_valid_username($username) || !is_valid_password($password)) {
+        return;
+    }
+    $pdo = get_auth_db();
+    if (!$pdo) {
+        error_log('cardobot_ensure_test_user: no DB connection');
+        return;
+    }
+    $hash = password_hash($password, PASSWORD_DEFAULT);
+    try {
+        if (username_exists($username)) {
+            $stmt = $pdo->prepare(
+                "UPDATE cardobot_users
+                 SET password_hash = ?, auth_method = 'password'
+                 WHERE username = ?"
+            );
+            $stmt->execute([$hash, $username]);
+            return;
+        }
+        $stmt = $pdo->prepare(
+            "INSERT INTO cardobot_users (username, password_hash, auth_method, created_at)
+             VALUES (?, ?, 'password', NOW())"
+        );
+        $stmt->execute([$username, $hash]);
+        get_user_dir($username);
+    } catch (Throwable $e) {
+        error_log('cardobot_ensure_test_user: ' . $e->getMessage());
+    }
+}
+
+/**
+ * Wipe PHP (+ DB if available) Cardy chat state for the always-fresh test account.
+ */
+function cardobot_wipe_test_user_chat(int $userId): void {
+    $_SESSION['cardobot_sessions'] = [];
+    if ($userId <= 0) {
+        return;
+    }
+    require_once __DIR__ . '/state.php';
+    if (function_exists('cardy_session_clear_for_user')) {
+        cardy_session_clear_for_user($userId);
+    }
+}
+
+/**
  * Log in a user (set session)
  * @param array $user User data (from database or admin)
  */
@@ -507,6 +578,15 @@ function login_user(array $user): void {
         'email' => $user['email'] ?? null,
         'auth_method' => $user['auth_method'] ?? 'password'
     ];
+
+    // Pipeline test account: always start Cardy from a clean slate.
+    if (cardobot_is_test_user((string)($user['username'] ?? ''))) {
+        $uid = (int)($user['id'] ?? 0);
+        if ($uid <= 0) {
+            $uid = (int)(ensure_user_row() ?: 0);
+        }
+        cardobot_wipe_test_user_chat($uid);
+    }
 }
 
 /**
