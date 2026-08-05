@@ -6,7 +6,7 @@
 
   const L = () => global.CardobotLayout || {
     CARD_W: 606, CARD_H: 800,
-    ART_STUDIO: { x: 63, y: 90, w: 480, h: 480 },
+    ART_STUDIO: { x: 55, y: 77, w: 496, h: 496 },
     NICKNAME: { x: 80, y: 48, fontSize: 32, color: '#585858' },
     BIO: { x: 120, y: 616, w: 430, fontSize: 14, color: 'rgba(44,127,162,1)', maxLines: 4 },
     POWER: { x: 277, y: 710, fontSize: 14, color: 'rgba(218,239,237,0.9)' },
@@ -557,8 +557,8 @@
       } catch (e) { /* optional */ }
 
       if (this.artImage) {
-        // Match .studio-art CSS scale(1.08) so export crops paper margins the same way.
-        const bleed = 1.08;
+        // Match .studio-art CSS scale(1.16) so export crops paper margins the same way.
+        const bleed = 1.16;
         const aw = art.w * scale * bleed;
         const ah = art.h * scale * bleed;
         const ax = art.x * scale - (aw - art.w * scale) / 2;

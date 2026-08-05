@@ -26,7 +26,7 @@
       ability_name: 12,
       ability_line: 8,
       power_value: 8,
-      bio: 100,
+      bio: 90,
     },
     NAME_INKS: {
       slate: 'rgba(88,88,88,1)',
@@ -52,68 +52,68 @@
       warm_cargo: { h: 28, s: 40, l: 40 },
       deep_cyan: { h: 188, s: 55, l: 34 },
     },
-    // Square art well; fill the printed window; bottom stays above the "i" (~y 575).
+    // Square art well: fill the printed window; bottom clears the "i" cutout (~y 575).
     ART: (() => {
-      const y = sy(52);
-      const side = Math.min(sx(310), 570 - y);
+      const y = sy(48);
+      const side = Math.min(sx(322), 568 - y);
       const x = Math.round((CARD_W - side) / 2);
       return { x, y, w: side, h: side };
     })(),
     NICKNAME: {
-      x: sx(36), y: sy(28), w: sx(230), h: sy(20),
-      fontSize: 13, fontWeight: '400', color: 'rgba(88,88,88,1)',
-      align: 'left', maxLines: 1, lineHeight: 1, minFontSize: 7,
+      x: sx(36), y: sy(28), w: sx(230), h: sy(18),
+      fontSize: 11, fontWeight: '400', color: 'rgba(88,88,88,1)',
+      align: 'left', maxLines: 1, lineHeight: 1, minFontSize: 6,
     },
     CREDIT: {
-      x: sx(130), y: sy(330), w: sx(190), h: sy(16),
-      fontSize: 8, fontWeight: '400', color: 'rgba(255,236,228,0.95)',
+      x: sx(130), y: sy(338), w: sx(190), h: sy(14),
+      fontSize: 7, fontWeight: '400', color: 'rgba(255,236,228,0.95)',
       align: 'right', maxLines: 1, lineHeight: 1,
       textShadow: '0 0 3px rgba(0,0,0,0.95), 0 1px 0 rgba(0,0,0,0.8), 0 -1px 0 rgba(0,0,0,0.55)',
     },
-    // Meta row: Press Start glyphs are ~1em wide; keep labels short and MASS widest.
+    // Meta row: Press Start is wide; keep tiny and MASS widest.
     TYPE: {
-      x: sx(68), y: sy(356), w: sx(88), h: sy(11),
-      fontSize: 6, fontWeight: '400', color: 'rgba(88,88,88,1)',
-      align: 'left', maxLines: 1, lineHeight: 1, minFontSize: 5,
+      x: sx(68), y: sy(356), w: sx(88), h: sy(10),
+      fontSize: 5, fontWeight: '400', color: 'rgba(88,88,88,1)',
+      align: 'left', maxLines: 1, lineHeight: 1, minFontSize: 4,
     },
     HEIGHT: {
-      x: sx(158), y: sy(356), w: sx(78), h: sy(11),
-      fontSize: 6, fontWeight: '400', color: 'rgba(88,88,88,1)',
-      align: 'right', maxLines: 1, lineHeight: 1, minFontSize: 5,
+      x: sx(158), y: sy(356), w: sx(78), h: sy(10),
+      fontSize: 5, fontWeight: '400', color: 'rgba(88,88,88,1)',
+      align: 'right', maxLines: 1, lineHeight: 1, minFontSize: 4,
     },
     MASS: {
-      x: sx(238), y: sy(356), w: sx(90), h: sy(11),
-      fontSize: 6, fontWeight: '400', color: 'rgba(88,88,88,1)',
-      align: 'right', maxLines: 1, lineHeight: 1, minFontSize: 5,
+      x: sx(238), y: sy(356), w: sx(90), h: sy(10),
+      fontSize: 5, fontWeight: '400', color: 'rgba(88,88,88,1)',
+      align: 'right', maxLines: 1, lineHeight: 1, minFontSize: 4,
     },
     BIO: {
-      x: sx(72), y: sy(378), w: sx(248), h: sy(44),
-      fontSize: 6, fontWeight: '400', color: 'rgba(44,127,162,1)',
-      align: 'left', maxLines: 5, lineHeight: 1.4, minFontSize: 5,
+      x: sx(72), y: sy(376), w: sx(248), h: sy(46),
+      fontSize: 5, fontWeight: '400', color: 'rgba(44,127,162,1)',
+      align: 'left', maxLines: 6, lineHeight: 1.35, minFontSize: 4,
     },
     POWER: {
       x: sx(148), y: sy(433), w: sx(176), h: sy(13),
-      fontSize: 7, fontWeight: '400', color: 'rgba(218,239,237,0.95)',
+      fontSize: 6, fontWeight: '400', color: 'rgba(218,239,237,0.95)',
       align: 'left', maxLines: 1, transform: 'uppercase', valign: 'center',
-      lineHeight: 1, minFontSize: 5,
+      lineHeight: 1, minFontSize: 4,
     },
     ABILITY: {
       x: sx(148), y: sy(447), w: sx(176), h: sy(13),
-      fontSize: 7, fontWeight: '400', color: 'rgba(249,187,170,0.95)',
+      fontSize: 6, fontWeight: '400', color: 'rgba(249,187,170,0.95)',
       align: 'left', maxLines: 1, transform: 'uppercase', valign: 'center',
-      lineHeight: 1, minFontSize: 5,
+      lineHeight: 1, minFontSize: 4,
     },
     HP: {
-      x: sx(288), y: sy(38), w: sx(44), h: sy(18),
-      fontSize: 14, fontWeight: '400', color: 'rgba(224,126,140,0.95)',
-      align: 'center', maxLines: 1, lineHeight: 1,
+      x: sx(288), y: sy(38), w: sx(44), h: sy(16),
+      fontSize: 11, fontWeight: '400', color: 'rgba(224,126,140,0.95)',
+      align: 'center', maxLines: 1, lineHeight: 1, minFontSize: 6,
     },
     STATS: [
-      { key: 'npo', label: 'NPO', x: sx(40), y: sy(64), w: sx(48), h: sy(20), fontSize: 11, align: 'left' },
-      { key: 'att', label: 'ATT', x: sx(40), y: sy(122), w: sx(48), h: sy(20), fontSize: 11, align: 'left' },
-      { key: 'str', label: 'STR', x: sx(40), y: sy(180), w: sx(48), h: sy(20), fontSize: 11, align: 'left' },
-      { key: 'los', label: 'LOS', x: sx(40), y: sy(238), w: sx(48), h: sy(20), fontSize: 11, align: 'left' },
-      { key: 'con', label: 'CON', x: sx(40), y: sy(296), w: sx(48), h: sy(20), fontSize: 11, align: 'left' },
+      { key: 'npo', label: 'NPO', x: sx(40), y: sy(64), w: sx(48), h: sy(18), fontSize: 9, align: 'left' },
+      { key: 'att', label: 'ATT', x: sx(40), y: sy(122), w: sx(48), h: sy(18), fontSize: 9, align: 'left' },
+      { key: 'str', label: 'STR', x: sx(40), y: sy(180), w: sx(48), h: sy(18), fontSize: 9, align: 'left' },
+      { key: 'los', label: 'LOS', x: sx(40), y: sy(238), w: sx(48), h: sy(18), fontSize: 9, align: 'left' },
+      { key: 'con', label: 'CON', x: sx(40), y: sy(296), w: sx(48), h: sy(18), fontSize: 9, align: 'left' },
     ],
     STAT_COLOR: 'rgba(255,255,255,0.95)',
     BACKS: [

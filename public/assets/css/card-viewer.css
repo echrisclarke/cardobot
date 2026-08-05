@@ -124,7 +124,7 @@
   position: absolute;
   inset: 0;
   backface-visibility: hidden;
-  border-radius: 1.4rem;
+  border-radius: 2.35rem;
   overflow: hidden;
   box-shadow:
     0 0 0 1px rgba(87, 189, 206, 0.2),

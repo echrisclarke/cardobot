@@ -12,7 +12,7 @@ const CARDY_LIMIT_NICKNAME = 16;
 const CARDY_LIMIT_POWER = 12;
 const CARDY_LIMIT_ABILITY_NAME = 12;
 const CARDY_LIMIT_ABILITY = 8;
-const CARDY_LIMIT_BIO = 100;
+const CARDY_LIMIT_BIO = 90;
 const CARDY_LIMIT_POWER_VALUE = 8;
 
 function cardy_clip(string $text, int $max): string {

@@ -26,7 +26,7 @@
   width: min(303px, 86vw);
   aspect-ratio: 303 / 400;
   overflow: hidden;
-  border-radius: 1.4rem;
+  border-radius: 2.35rem;
   box-shadow: 0 8px 28px rgba(0, 0, 0, 0.35);
   container-type: inline-size;
   container-name: studio-card;
@@ -56,13 +56,13 @@
 .studio-art-wrap {
   /* Fallback square well; card-studio.js overwrites from CardLayout.ART. */
   position: absolute;
-  left: 10.4%;
-  top: 11.25%;
-  width: 79.2%;
-  height: 60%;
+  left: 8.5%;
+  top: 9.5%;
+  width: 83%;
+  height: 62%;
   z-index: 2;
   overflow: hidden;
-  border-radius: 0.55rem;
+  border-radius: 0.85rem;
 }
 
 .studio-art {
@@ -72,7 +72,7 @@
   height: 100%;
   object-fit: cover;
   /* Crop residual AI paper margins so paint hits the printed well. */
-  transform: scale(1.08);
+  transform: scale(1.16);
   transform-origin: center center;
   pointer-events: none;
 }
