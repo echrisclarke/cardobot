@@ -111,6 +111,25 @@
       const multi = (box.maxLines || 1) > 1;
       const align = box.align || 'left';
       const valignStart = multi || box.valign === 'start';
+      // Multi-line: grid for vertical centering. Stretch + min-width:0 so
+      // lines wrap inside the well (start sizing can overflow the right rule).
+      const layoutCss = multi
+        ? [
+            'display:grid',
+            'align-content:center',
+            'justify-items:stretch',
+            'min-width:0',
+            'text-align:' + align,
+            'padding:0.28em 0.5em 0.28em 0',
+          ]
+        : [
+            'display:flex',
+            valignStart ? 'align-items:flex-start' : 'align-items:center',
+            align === 'center' ? 'justify-content:center'
+              : (align === 'right' ? 'justify-content:flex-end' : 'justify-content:flex-start'),
+            // Right-aligned meta needs a hair of inset so units (t/kg) are not clipped.
+            align === 'right' ? 'padding:0 0.2em 0 0' : 'padding:0',
+          ];
       el.style.cssText = [
         'position:absolute',
         'left:' + ((box.x / W) * 100).toFixed(2) + '%',
@@ -120,7 +139,6 @@
         'font-size:calc(' + fs + ' / ' + W + ' * 100cqw)',
         'font-weight:' + (box.fontWeight || '400'),
         'color:' + (box.color || '#222'),
-        'text-align:' + align,
         'line-height:' + (box.lineHeight || 1.15),
         'overflow:hidden',
         'white-space:' + (multi ? 'normal' : 'nowrap'),
@@ -129,12 +147,8 @@
         'text-transform:' + (box.transform || 'none'),
         box.textShadow ? 'text-shadow:' + box.textShadow : '',
         'pointer-events:none',
-        'display:flex',
-        valignStart ? 'align-items:flex-start' : 'align-items:center',
-        align === 'center' ? 'justify-content:center'
-          : (align === 'right' ? 'justify-content:flex-end' : 'justify-content:flex-start'),
+        ...layoutCss,
         'box-sizing:border-box',
-        'padding:0',
         'margin:0',
       ].filter(Boolean).join(';');
       this.textLayer.appendChild(el);
@@ -161,7 +175,7 @@
         el.style.fontSize = 'calc(' + size + ' / ' + W + ' * 100cqw)';
       };
       const overflows = () => multi
-        ? (el.scrollHeight > el.clientHeight + 1)
+        ? (el.scrollHeight > el.clientHeight + 1 || el.scrollWidth > el.clientWidth + 1)
         : (el.scrollWidth > el.clientWidth + 1);
 
       apply(fs);
@@ -170,10 +184,19 @@
         apply(fs);
       }
       // Last resort: trim at a word boundary (never leave "...").
+      // Prefer shortening the number so mass/height units (t, kg, m) stay visible.
       if (overflows()) {
         apply(minFs);
         fs = minFs;
         while (value.length > 1 && overflows()) {
+          const unitMatch = value.match(/(\d+(?:\.\d+)?)\s+([a-z]+)\s*$/i);
+          if (unitMatch && unitMatch[1].length > 1) {
+            const num = unitMatch[1];
+            const unit = unitMatch[2];
+            value = value.slice(0, unitMatch.index) + num.slice(0, -1) + ' ' + unit;
+            el.textContent = value;
+            continue;
+          }
           const sp = value.lastIndexOf(' ');
           value = (sp > 0 ? value.slice(0, sp) : value.slice(0, -1))
             .replace(/[,\s.;:…]+$/g, '')

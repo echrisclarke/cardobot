@@ -3,6 +3,24 @@
  * Build image prompts from player-authored visual_concept.
  */
 
+/**
+ * Locked Card-o-Bot house art language (medium + line + finish).
+ * Personality and cuteness follow the subject; do not force mascot faces.
+ */
+function cardobot_house_art_style(): string {
+    return 'STYLE NAME: Card-o-Bot Gouache (mandatory house look on every card). '
+        . 'Opaque gouache / poster paint on warm tooth paper, matte finish, soft vignette, '
+        . 'chunky brush tips with visible paint thickness and odd handmade quirkiness. '
+        . 'Imperfect on purpose: uneven coverage, slight wonky proportions, charming mistakes welcome; not polished, not perfect, not concept-art clean. '
+        . 'Approachable and friendly without babyish mascot energy. '
+        . 'Expression and cuteness follow the character only; no default smiles or sparkle-eyed plush look. '
+        . 'LINEWORK: outlines shift color as they travel (picking up neighboring paint), not one flat ink color everywhere; '
+        . 'in places the contour breaks into visible graphite pencil; edges can feel slightly unfinished or open, '
+        . 'especially toward the outer margins. '
+        . 'Subtle Card-o-Bot tells: light paper grain, hand wobble, thin teal or copper rim on some silhouette edges. '
+        . 'No photorealism, no glossy 3D render, no cinematic HDR, no lens blur.';
+}
+
 function build_render_prompt(array $concept, array $memoryHints = []): string {
     $kind = trim((string)($concept['type'] ?? ''));
     $subject = trim((string)($concept['subject'] ?? ''));
@@ -58,7 +76,7 @@ function build_render_prompt(array $concept, array $memoryHints = []): string {
         $parts[] = 'Subtle style continuity: ' . implode('; ', array_slice($memoryHints, 0, 2));
     }
 
-    $parts[] = 'Painterly, beautiful illustration in the style of charming sci-fi novel cover art and collectible card art. Rich colors, atmospheric lighting, approachable character design, family-friendly';
+    $parts[] = cardobot_house_art_style();
     $parts[] = 'Follow the description faithfully: person, robot, android, little ship critter, or stranger as written. No anthropomorphic animal hybrids, no furry costume aesthetic';
 
     $shipCue = strtolower($kind . ' ' . $subject . ' ' . $details . ' ' . $setting);

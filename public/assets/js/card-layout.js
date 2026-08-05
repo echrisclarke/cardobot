@@ -66,27 +66,28 @@
       align: 'right', maxLines: 1,
       textShadow: '0 0 3px rgba(0,0,0,0.95), 0 1px 0 rgba(0,0,0,0.8), 0 -1px 0 rgba(0,0,0,0.55)',
     },
-    // Under-art strip: equal air above type row and below bio (art ~359, panel ~425)
+    // Under-art strip: meta above printed dotted rule (~y 600); bio fills to power panel.
     TYPE: {
-      x: sx(70), y: sy(364), w: sx(105), h: sy(12),
+      x: sx(70), y: sy(354), w: sx(105), h: sy(12),
       fontSize: sy(9), fontWeight: '400', color: 'rgba(88,88,88,1)',
       align: 'left', maxLines: 1,
     },
     HEIGHT: {
-      // Keep a clear gap before MASS (wells must not overlap).
-      x: sx(175), y: sy(364), w: sx(70), h: sy(12),
+      // Leave MASS a wide right well so "180000 t" keeps its unit.
+      x: sx(168), y: sy(354), w: sx(62), h: sy(12),
       fontSize: sy(9), fontWeight: '400', color: 'rgba(88,88,88,1)',
       align: 'right', maxLines: 1,
     },
     MASS: {
-      x: sx(255), y: sy(364), w: sx(73), h: sy(12),
+      x: sx(236), y: sy(354), w: sx(90), h: sy(12),
       fontSize: sy(9), fontWeight: '400', color: 'rgba(88,88,88,1)',
       align: 'right', maxLines: 1,
     },
     BIO: {
-      x: sx(72), y: sy(379), w: sx(256), h: sy(42),
-      fontSize: sy(12), fontWeight: '400', color: 'rgba(44,127,162,1)',
-      align: 'left', maxLines: 4, lineHeight: 1.2,
+      // Inside printed bio well; keep clear of the right dotted vertical rule (~x 560).
+      x: sx(72), y: sy(379), w: sx(248), h: sy(42),
+      fontSize: sy(11), fontWeight: '400', color: 'rgba(44,127,162,1)',
+      align: 'left', maxLines: 4, lineHeight: 1.28,
     },
     // Dark panel ~y 425. White divider ~x 141–145.
     // One full-width value column for both rows (power title+value share the power well).

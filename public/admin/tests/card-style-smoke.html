@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Card style smoke</title>
+  <link rel="stylesheet" href="../../assets/css/studio.css">
+  <style>
+    body { font-family: system-ui, sans-serif; background: #1c1c1c; color: #eee; padding: 1rem; }
+    h1 { margin: 0 0 0.35rem; }
+    h2 { margin: 1.5rem 0 0.5rem; font-size: 1.15rem; color: #9fd4ff; }
+    .blurb { font-size: 13px; color: #bbb; max-width: 70ch; margin: 0 0 0.75rem; }
+    .row { display: flex; flex-wrap: wrap; gap: 1.25rem; align-items: flex-start; }
+    .case { background: #2a2a2a; padding: 0.75rem; border-radius: 8px; max-width: 340px; }
+    .case h3 { margin: 0 0 0.35rem; font-size: 0.95rem; }
+    .meta { font-size: 12px; color: #bbb; white-space: pre-wrap; margin: 0.5rem 0 0; }
+    #report { margin-top: 1.25rem; font-family: ui-monospace, monospace; font-size: 12px; white-space: pre-wrap; }
+    .pass { color: #7dffa0; }
+    .fail { color: #ff8a8a; }
+    a { color: #8ecfff; }
+  </style>
+</head>
+<body>
+  <h1>Card style smoke</h1>
+  <p>
+    Loads <code>smoke-out/styles/manifest.json</code> from
+    <a href="run-style-smoke.php">run-style-smoke.php</a>
+    (or <code>php run-style-smoke.php</code>).
+  </p>
+  <div id="styles"></div>
+  <div id="report"></div>
+
+  <script src="../../assets/js/card-layout.js"></script>
+  <script src="../../assets/js/drawing-engine.js"></script>
+  <script src="../../assets/js/card-studio.js"></script>
+  <script>
+    const assetBase = '../..';
+
+    async function renderCard(entry, hostRow) {
+      const wrap = document.createElement('div');
+      wrap.className = 'case';
+      const title = (entry.concept && (entry.concept.nickname || entry.concept.subject)) || 'Card';
+      wrap.innerHTML = '<h3></h3><div class="host"></div><pre class="meta"></pre>';
+      wrap.querySelector('h3').textContent = title;
+      hostRow.appendChild(wrap);
+
+      if (!entry.concept) {
+        wrap.querySelector('.meta').textContent = 'ERROR: ' + (entry.error || 'no concept');
+        return { name: title, fails: ['no concept'], style: entry.style_key };
+      }
+
+      const studio = new window.CardobotStudio({
+        root: wrap.querySelector('.host'),
+        assetBase,
+        frameUrl: assetBase + '/assets/img/01_Card.png',
+        bgUrl: assetBase + '/assets/img/01_CardBGtexture.png',
+        hideTools: true,
+      });
+      studio.setConcept(entry.concept, entry.stats || {});
+      if (entry.art && !/^https?:/i.test(entry.art)) {
+        await studio.setArt('smoke-out/styles/' + (entry.art_dir || entry.style_key) + '/' + entry.art);
+      } else if (entry.art) {
+        await studio.setArt(entry.art);
+      }
+      await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+      await new Promise((r) => setTimeout(r, 60));
+
+      const fails = [];
+      if (!entry.ok_art) fails.push('art missing');
+
+      wrap.querySelector('.meta').textContent = [
+        (entry.concept.type || '') + ' · ' + (entry.seed || ''),
+        (entry.concept.power_name || '') + ' ' + (entry.concept.power_value || ''),
+        entry.art ? ('art: ' + entry.art + (entry.provider ? ' via ' + entry.provider : '')) : 'no art',
+        fails.length ? ('FAIL: ' + fails.join('; ')) : 'ok',
+      ].join('\n');
+
+      return { name: title, fails, style: entry.style_key };
+    }
+
+    (async function main() {
+      const report = document.getElementById('report');
+      const root = document.getElementById('styles');
+      let manifest;
+      try {
+        const res = await fetch('smoke-out/styles/manifest.json?v=' + Date.now());
+        if (!res.ok) throw new Error('manifest HTTP ' + res.status);
+        manifest = await res.json();
+      } catch (e) {
+        report.innerHTML = '<div class="fail">No style manifest yet. Run <a href="run-style-smoke.php">run-style-smoke.php</a> first.<br>'
+          + String(e.message || e) + '</div>';
+        document.title = 'FAIL card style smoke';
+        return;
+      }
+
+      const results = [];
+      const order = ['a', 'b', 'c'];
+      for (const key of order) {
+        const group = (manifest.styles || {})[key];
+        if (!group) continue;
+        const section = document.createElement('section');
+        section.innerHTML = '<h2></h2><p class="blurb"></p><div class="row"></div>';
+        section.querySelector('h2').textContent = 'Style ' + key.toUpperCase() + ': ' + group.name;
+        section.querySelector('.blurb').textContent = group.block || '';
+        root.appendChild(section);
+        const row = section.querySelector('.row');
+        for (const card of (group.cards || [])) {
+          results.push(await renderCard(card, row));
+        }
+      }
+
+      let failed = 0;
+      const lines = results.map((r) => {
+        if (r.fails.length) {
+          failed++;
+          return 'FAIL [' + (r.style || '?') + '] ' + r.name + ': ' + r.fails.join('; ');
+        }
+        return 'PASS [' + (r.style || '?') + '] ' + r.name;
+      });
+      lines.push(failed ? ('\n' + failed + ' failed') : '\nAll style smoke cards painted');
+      lines.push('Generated ' + (manifest.generated_at || '') + ' in ' + (manifest.elapsed_sec || '?') + 's');
+      report.innerHTML = lines.map((l) =>
+        '<div class="' + (l.startsWith('FAIL') ? 'fail' : 'pass') + '">' + l + '</div>'
+      ).join('');
+      document.title = failed ? 'FAIL card style smoke' : 'PASS card style smoke';
+      window.__cardStyleSmoke = { failed, results, manifest };
+    })();
+  </script>
+</body>
+</html>
