@@ -127,7 +127,8 @@ $cardy_apply_locale = static function (array &$session, string $code, int $userI
 $cardy_preferred_greeting = static function (array &$session, string $code) use (&$loc, &$refreshLocalePack, $pathChipsFor): array {
     $nameEn = I18N_PRESET_LOCALES[$code]['name_en'] ?? $code;
     $nameNative = I18N_PRESET_LOCALES[$code]['name_native'] ?? $code;
-    i18n_ensure_locale($code, $nameEn, $nameNative);
+    // Never block greeting on AI translation.
+    i18n_ensure_locale($code, $nameEn, $nameNative, false);
     $session['locale'] = $code;
     $session['locale_picked'] = true;
     $session['awaiting_locale_confirm'] = false;
@@ -150,7 +151,8 @@ $cardy_soft_confirm_greeting = static function (array &$session, int $userId, ?a
         : i18n_predict_locale($userId, $navigatorLanguages);
     $nameEn = I18N_PRESET_LOCALES[$candidate]['name_en'] ?? $candidate;
     $nameNative = I18N_PRESET_LOCALES[$candidate]['name_native'] ?? $candidate;
-    i18n_ensure_locale($candidate, $nameEn, $nameNative);
+    // Never block greeting on AI translation.
+    i18n_ensure_locale($candidate, $nameEn, $nameNative, false);
     $session['locale'] = $candidate;
     $session['locale_picked'] = false;
     $session['awaiting_locale_confirm'] = true;

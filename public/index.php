@@ -533,7 +533,7 @@ body.chat-page .chat-messages.show-cardy-bg {
     // ============================================================
     //   HTTP helper
     // ============================================================
-    async function postJson(url, body, attempt) {
+    async function postJson(url, body, attempt, signal) {
         attempt = attempt || 0;
         let res;
         try {
@@ -542,9 +542,15 @@ body.chat-page .chat-messages.show-cardy-bg {
                 credentials: 'same-origin',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(body || {}),
+                signal: signal || undefined,
             });
         } catch (netErr) {
-            if (attempt < 1) return postJson(url, body, attempt + 1);
+            if (signal && signal.aborted) {
+                const abortErr = new Error('Cardy boot timed out');
+                abortErr.name = 'AbortError';
+                throw abortErr;
+            }
+            if (attempt < 1) return postJson(url, body, attempt + 1, signal);
             throw new Error(netErr.message || 'Network error');
         }
         let data = null;
@@ -635,11 +641,13 @@ body.chat-page .chat-messages.show-cardy-bg {
     }
 
     async function preloadGreeting() {
+        const bootCtrl = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+        const bootTimer = bootCtrl ? setTimeout(() => bootCtrl.abort(), 15000) : null;
         try {
             const data = await postJson(basePath + '/api/chat.php', {
                 action: 'resume',
                 navigator_languages: navigatorLanguages(),
-            });
+            }, 0, bootCtrl ? bootCtrl.signal : null);
             if (!data.session_id) throw new Error('No session from Cardy');
             applyBootPayload(data);
             if (data.resumed) {
@@ -650,22 +658,38 @@ body.chat-page .chat-messages.show-cardy-bg {
             markGreetingReady();
         } catch (err) {
             console.error('greeting preload failed:', err);
-            state.greetingError = err.message || 'unknown error';
+            const aborted = err && (err.name === 'AbortError' || /timed out|aborted/i.test(String(err.message || '')));
+            state.greetingError = aborted
+                ? 'Cardy is taking too long to wake up.'
+                : (err.message || 'unknown error');
             state.greeting = null;
             state.greetingReady = false;
             if (/Authentication required/i.test(state.greetingError)) {
                 return; // postJson already sent us to login
             }
             if ($chatLoadingBar) {
-                const t = $chatLoadingBar.querySelector('.loading-text');
-                if (t) t.textContent = 'Connection glitch. Tap Continue to retry.';
+                const loadingText = $chatLoadingBar.querySelector('.loading-text');
+                if (loadingText) {
+                    loadingText.textContent = t('chat.init_glitch', 'Connection glitch. Tap Continue to retry.');
+                }
             }
             const noticeBtn = document.querySelector('#noticeContinueBtn .continue-button');
             if (noticeBtn) {
                 noticeBtn.disabled = false;
                 noticeBtn.style.opacity = '1';
-                noticeBtn.onclick = () => { state.greetingReady = false; preloadGreeting(); };
+                noticeBtn.style.cursor = 'pointer';
+                noticeBtn.onclick = () => {
+                    state.greetingReady = false;
+                    state.greetingError = null;
+                    preloadGreeting();
+                };
             }
+            const waiting = document.querySelector('#noticeContinueBtn .waiting-text');
+            if (waiting) {
+                waiting.textContent = state.greetingError + ' Tap Continue to retry.';
+            }
+        } finally {
+            if (bootTimer) clearTimeout(bootTimer);
         }
     }
     // Boot chrome in English until resume/greeting returns the real locale.

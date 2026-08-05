@@ -200,6 +200,10 @@ function i18n_store_strings(PDO $pdo, string $code, array $strings, string $sour
 }
 
 function i18n_seed_presets_if_needed(): void {
+    static $doneVersion = null;
+    if ($doneVersion === I18N_CATALOG_VERSION) {
+        return;
+    }
     $pdo = i18n_pdo();
     if (!$pdo) {
         return;
@@ -226,6 +230,7 @@ function i18n_seed_presets_if_needed(): void {
         i18n_upsert_locale_row($pdo, $code, $meta['name_en'], $meta['name_native'], 'ready', I18N_CATALOG_VERSION);
         i18n_store_strings($pdo, $code, $merged, 'seed', I18N_CATALOG_VERSION);
     }
+    $doneVersion = I18N_CATALOG_VERSION;
 }
 
 function i18n_fetch_pack(string $code): array {
@@ -517,8 +522,12 @@ function i18n_translate_keys(string $code, string $nameEn, array $keys): array {
 
 /**
  * Ensure locale pack is ready (seed or AI). Returns pack array.
+ *
+ * Preset locales with seed packs never block on OpenAI. Missing keys fall back
+ * to English so Cardy boot / resume stays fast. AI fill is only for custom
+ * "Other language" locales the visitor explicitly requested.
  */
-function i18n_ensure_locale(string $code, string $nameEn = '', string $nameNative = ''): array {
+function i18n_ensure_locale(string $code, string $nameEn = '', string $nameNative = '', bool $allowAiFill = true): array {
     $code = i18n_normalize_code($code) ?: 'en';
     if ($code === 'en') {
         return i18n_fetch_pack('en');
@@ -532,24 +541,50 @@ function i18n_ensure_locale(string $code, string $nameEn = '', string $nameNativ
     }
 
     $missing = i18n_missing_keys($code);
-    if ($pack['status'] === 'ready' && !$missing) {
+    // Recover stuck "building" rows once keys are present.
+    if (!$missing && ($pack['status'] === 'ready' || $pack['status'] === 'building')) {
+        if ($pdo && $pack['status'] !== 'ready') {
+            i18n_upsert_locale_row(
+                $pdo,
+                $code,
+                (string)($pack['name_en'] ?: $code),
+                (string)($pack['name_native'] ?: $code),
+                'ready',
+                I18N_CATALOG_VERSION
+            );
+            return i18n_fetch_pack($code);
+        }
         return $pack;
     }
 
+    $seed = i18n_load_seed_pack($code);
+    $isPresetSeeded = $seed !== null && isset(I18N_PRESET_LOCALES[$code]);
+    // Boot path must never wait on model translation for house languages.
+    $useAi = $allowAiFill && !$isPresetSeeded;
+
     if (!$pdo) {
-        $seed = i18n_load_seed_pack($code);
         if ($seed) {
             return i18n_fetch_pack($code);
         }
-        // No DB: cannot permanently cache AI fills.
         $nameEn = $nameEn !== '' ? $nameEn : ($pack['name_en'] ?: $code);
-        $translated = i18n_translate_keys($code, $nameEn, array_keys(i18n_catalog_en()));
+        if ($useAi) {
+            $translated = i18n_translate_keys($code, $nameEn, array_keys(i18n_catalog_en()));
+            return [
+                'code' => $code,
+                'name_en' => $nameEn,
+                'name_native' => $nameNative !== '' ? $nameNative : $code,
+                'status' => 'ready',
+                'strings' => array_merge(i18n_catalog_en(), $translated),
+                'catalog_version' => I18N_CATALOG_VERSION,
+                'ephemeral' => true,
+            ];
+        }
         return [
             'code' => $code,
             'name_en' => $nameEn,
             'name_native' => $nameNative !== '' ? $nameNative : $code,
             'status' => 'ready',
-            'strings' => array_merge(i18n_catalog_en(), $translated),
+            'strings' => i18n_catalog_en(),
             'catalog_version' => I18N_CATALOG_VERSION,
             'ephemeral' => true,
         ];
@@ -562,16 +597,34 @@ function i18n_ensure_locale(string $code, string $nameEn = '', string $nameNativ
     if ($nameNative === '') {
         $nameNative = $pack['name_native'] ?: $nameEn;
     }
-    i18n_upsert_locale_row($pdo, $code, $nameEn, $nameNative, 'building', I18N_CATALOG_VERSION);
 
-    $seed = i18n_load_seed_pack($code);
+    $catalog = i18n_catalog_en();
     if ($seed) {
-        i18n_store_strings($pdo, $code, $seed, 'seed', I18N_CATALOG_VERSION);
+        $merged = array_merge($catalog, $seed);
+        foreach ($seed as $k => $v) {
+            $merged[$k] = $v;
+        }
+        i18n_store_strings($pdo, $code, $merged, 'seed', I18N_CATALOG_VERSION);
     }
+
     $missing = i18n_missing_keys($code);
     if ($missing) {
-        $translated = i18n_translate_keys($code, $nameEn, $missing);
-        i18n_store_strings($pdo, $code, $translated, 'ai', I18N_CATALOG_VERSION);
+        if ($useAi) {
+            i18n_upsert_locale_row($pdo, $code, $nameEn, $nameNative, 'building', I18N_CATALOG_VERSION);
+            $translated = i18n_translate_keys($code, $nameEn, $missing);
+            i18n_store_strings($pdo, $code, $translated, 'ai', I18N_CATALOG_VERSION);
+        } else {
+            // Instant English fallback for any key still absent (keeps boot unblocked).
+            $fill = [];
+            foreach ($missing as $key) {
+                if (isset($catalog[$key])) {
+                    $fill[$key] = $catalog[$key];
+                }
+            }
+            if ($fill) {
+                i18n_store_strings($pdo, $code, $fill, 'seed', I18N_CATALOG_VERSION);
+            }
+        }
     }
     i18n_upsert_locale_row($pdo, $code, $nameEn, $nameNative, 'ready', I18N_CATALOG_VERSION);
     return i18n_fetch_pack($code);
