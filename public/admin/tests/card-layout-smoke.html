@@ -5,7 +5,7 @@
   <title>Card layout smoke test</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Noto+Sans+SC:wght@400;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Roboto:wght@400;500;700&family=Noto+Sans+SC:wght@400;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="../../assets/css/studio.css">
   <style>
     body { font-family: system-ui, sans-serif; background: #222; color: #eee; padding: 1rem; }
@@ -115,8 +115,22 @@
         if (label === 'mass' && /^ass:/i.test(el.textContent.trim())) {
           fails.push('mass clipped to "ass:" (font/fit bug)');
         }
+        if (label === 'type' && !/^type:\s*/i.test(el.textContent.trim())) {
+          fails.push('type missing "type:" label');
+        }
+        if (label === 'height' && !/^weight:\s*/i.test(el.textContent.trim())) {
+          fails.push('height missing "weight:" label');
+        }
+        if (label === 'mass' && !/^mass:\s*/i.test(el.textContent.trim())) {
+          fails.push('mass missing "mass:" label');
+        }
         if (label === 'mass' && !/\b(kg|t|g|lb)\b/i.test(el.textContent)) {
           fails.push('mass missing unit');
+        }
+        if ((label === 'type' || label === 'height' || label === 'mass' || label === 'credit'
+          || label === 'power' || label === 'ability')
+          && el.style.fontFamily && !/roboto|sans-serif/i.test(el.style.fontFamily)) {
+          fails.push(label + ' not using sans face');
         }
         const powerOverflow = (label === 'power' || label === 'ability')
           ? (el.scrollWidth > el.clientWidth + 1
@@ -163,11 +177,13 @@
       if (bioFs && powerFs && Math.abs(bioFs - powerFs) > 3) {
         fails.push('bio/power size drift (' + bioFs + ' vs ' + powerFs + ')');
       }
-      // Ability should not duplicate the same token twice.
+      // Ability should not duplicate the same token twice (leaf spans only).
       if (studio.abilityEl) {
-        const spans = studio.abilityEl.querySelectorAll('span');
-        if (spans.length >= 2 && (spans[0].textContent || '') === (spans[1].textContent || '')
-          && (spans[0].textContent || '').trim() !== '') {
+        const leaves = Array.from(studio.abilityEl.querySelectorAll('span'))
+          .filter((s) => s.children.length === 0)
+          .map((s) => (s.textContent || '').trim())
+          .filter(Boolean);
+        if (leaves.length >= 2 && leaves[0] === leaves[1]) {
           fails.push('ability value duplicated');
         }
       }

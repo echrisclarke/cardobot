@@ -20,6 +20,8 @@
     CARD_H,
     // Press Start first; CJK/other scripts fall through to Noto / system.
     FACE_FONT: '"Press Start 2P", "Noto Sans SC", "Noto Sans JP", "Noto Sans", "Segoe UI", sans-serif',
+    // Matches printed INFERENCE POWER / SPECIAL ABILITY chrome on the frame.
+    FACE_SANS: 'Roboto, "Noto Sans", "Segoe UI", sans-serif',
     // Hard display caps for Press Start 2P (AI aims match; face shrinks, never ellipsis).
     LIMITS: {
       nickname: 16,
@@ -70,41 +72,46 @@
     },
     CREDIT: {
       x: sx(130), y: sy(338), w: sx(190), h: sy(14),
-      fontSize: 9, fontWeight: '400', color: 'rgba(255,236,228,0.95)',
-      align: 'right', maxLines: 1, lineHeight: 1, minFontSize: 7,
+      fontSize: 11, fontWeight: '500', color: 'rgba(255,236,228,0.95)',
+      align: 'right', maxLines: 1, lineHeight: 1, minFontSize: 8,
+      fontFamily: 'sans',
       textShadow: '0 0 3px rgba(0,0,0,0.95), 0 1px 0 rgba(0,0,0,0.8), 0 -1px 0 rgba(0,0,0,0.55)',
     },
     TYPE: {
-      x: sx(68), y: sy(356), w: sx(88), h: sy(11),
-      fontSize: 8, fontWeight: '400', color: 'rgba(88,88,88,1)',
-      align: 'left', maxLines: 1, lineHeight: 1, minFontSize: 7,
+      x: sx(64), y: sy(354), w: sx(96), h: sy(14),
+      fontSize: 12, fontWeight: '500', color: 'rgba(88,88,88,1)',
+      align: 'left', maxLines: 1, lineHeight: 1, minFontSize: 9,
+      fontFamily: 'sans',
     },
     HEIGHT: {
-      x: sx(158), y: sy(356), w: sx(78), h: sy(11),
-      fontSize: 8, fontWeight: '400', color: 'rgba(88,88,88,1)',
-      align: 'right', maxLines: 1, lineHeight: 1, minFontSize: 7,
+      x: sx(158), y: sy(354), w: sx(90), h: sy(14),
+      fontSize: 12, fontWeight: '500', color: 'rgba(88,88,88,1)',
+      align: 'center', maxLines: 1, lineHeight: 1, minFontSize: 9,
+      fontFamily: 'sans',
     },
     MASS: {
-      x: sx(238), y: sy(356), w: sx(90), h: sy(11),
-      fontSize: 8, fontWeight: '400', color: 'rgba(88,88,88,1)',
-      align: 'right', maxLines: 1, lineHeight: 1, minFontSize: 7,
+      x: sx(246), y: sy(354), w: sx(90), h: sy(14),
+      fontSize: 12, fontWeight: '500', color: 'rgba(88,88,88,1)',
+      align: 'right', maxLines: 1, lineHeight: 1, minFontSize: 9,
+      fontFamily: 'sans',
     },
     BIO: {
       x: sx(72), y: sy(374), w: sx(248), h: sy(42),
       fontSize: 11, fontWeight: '400', color: 'rgba(44,127,162,1)',
       align: 'left', maxLines: 5, lineHeight: 1.35, minFontSize: 7,
     },
+    // Sans to match printed INFERENCE POWER / SPECIAL ABILITY; center-anchored in value column.
     POWER: {
-      x: sx(148), y: sy(434), w: sx(176), h: sy(15),
-      fontSize: 11, fontWeight: '400', color: 'rgba(218,239,237,0.95)',
-      align: 'left', maxLines: 1, transform: 'uppercase', valign: 'start',
-      lineHeight: 1, minFontSize: 7,
+      x: sx(148), y: sy(432), w: sx(176), h: sy(16),
+      fontSize: 13, fontWeight: '500', color: 'rgba(218,239,237,0.95)',
+      align: 'center', maxLines: 1, transform: 'uppercase', valign: 'center',
+      lineHeight: 1, minFontSize: 8, fontFamily: 'sans',
     },
     ABILITY: {
-      x: sx(148), y: sy(448), w: sx(176), h: sy(15),
-      fontSize: 11, fontWeight: '400', color: 'rgba(249,187,170,0.95)',
-      align: 'left', maxLines: 1, transform: 'uppercase', valign: 'start',
-      lineHeight: 1, minFontSize: 7,
+      x: sx(148), y: sy(447), w: sx(176), h: sy(16),
+      fontSize: 13, fontWeight: '500', color: 'rgba(249,187,170,0.95)',
+      align: 'center', maxLines: 1, transform: 'uppercase', valign: 'center',
+      lineHeight: 1, minFontSize: 8, fontFamily: 'sans',
     },
     HP: {
       x: sx(288), y: sy(36), w: sx(44), h: sy(22),

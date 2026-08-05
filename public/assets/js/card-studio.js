@@ -166,7 +166,7 @@
             // Right-aligned meta needs a hair of inset so units (t/kg) are not clipped.
             align === 'right' ? 'padding:0 0.2em 0 0' : 'padding:0',
           ];
-      const faceFont = (L().FACE_FONT) || '"Press Start 2P", "Courier New", monospace';
+      const faceFont = this._faceFontForBox(box);
       el.style.cssText = [
         'position:absolute',
         'left:' + ((box.x / W) * 100).toFixed(2) + '%',
@@ -193,11 +193,21 @@
       return el;
     }
 
+    _faceFontForBox(box) {
+      const layout = L();
+      if (box && (box.fontFamily === 'sans' || box.fontFamily === layout.FACE_SANS)) {
+        return layout.FACE_SANS || 'Roboto, "Segoe UI", sans-serif';
+      }
+      if (box && box.fontFamily) return box.fontFamily;
+      return layout.FACE_FONT || '"Press Start 2P", "Courier New", monospace';
+    }
+
     async _ensureFaceFont() {
-      const faceFont = (L().FACE_FONT) || '"Press Start 2P", "Courier New", monospace';
       if (!document.fonts || !document.fonts.load) return;
       try {
-        await document.fonts.load('12px ' + faceFont);
+        const layout = L();
+        await document.fonts.load('12px ' + (layout.FACE_FONT || '"Press Start 2P"'));
+        await document.fonts.load('12px ' + (layout.FACE_SANS || 'Roboto, sans-serif'));
         await document.fonts.ready;
       } catch (e) { /* use fallback metrics */ }
     }
@@ -244,7 +254,7 @@
             continue;
           }
           // Drop Type:/H:/M: prefix before eating into the label letters.
-          const labeled = value.match(/^(type|height|mass|h|m)\s*:\s*(.+)$/i);
+          const labeled = value.match(/^(type|height|weight|mass|h|m)\s*:\s*(.+)$/i);
           if (labeled && labeled[2].length > 0) {
             value = labeled[2];
             el.textContent = value;
@@ -300,26 +310,37 @@
         valueText = '';
       }
       el.textContent = '';
+      const centerAnchor = box.align === 'center';
       el.style.display = 'flex';
-      el.style.justifyContent = 'space-between';
+      // Center-anchor the whole name(+value) group so it stays lined up with the printed title.
+      el.style.justifyContent = centerAnchor ? 'center' : 'space-between';
       el.style.alignItems = box.valign === 'start' ? 'flex-start' : 'center';
-      el.style.gap = '0.35em';
+      el.style.gap = '0.45em';
       el.style.whiteSpace = 'nowrap';
       el.style.overflow = 'hidden';
       el.style.textOverflow = 'clip';
       el.style.flexWrap = 'nowrap';
 
-      const left = document.createElement('span');
-      left.style.cssText = 'flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:clip;white-space:nowrap';
-      left.textContent = titleText;
-      el.appendChild(left);
+      const group = document.createElement('span');
+      group.style.cssText = centerAnchor
+        ? 'display:inline-flex;align-items:center;justify-content:center;gap:0.45em;max-width:100%;min-width:0;overflow:hidden'
+        : 'display:contents';
 
+      const left = document.createElement('span');
+      left.style.cssText = centerAnchor
+        ? 'overflow:hidden;text-overflow:clip;white-space:nowrap;min-width:0'
+        : 'flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:clip;white-space:nowrap';
+      left.textContent = titleText;
+      group.appendChild(left);
+
+      let right = null;
       if (valueText) {
-        const right = document.createElement('span');
+        right = document.createElement('span');
         right.style.cssText = 'flex:0 0 auto;white-space:nowrap;overflow:visible';
         right.textContent = valueText;
-        el.appendChild(right);
+        group.appendChild(right);
       }
+      el.appendChild(group);
 
       const base = box.fontSize || 14;
       const minFs = box.minFontSize != null ? box.minFontSize : 5;
@@ -329,6 +350,7 @@
       };
       const overflows = () => (
         el.scrollWidth > el.clientWidth + 1
+        || group.scrollWidth > el.clientWidth + 1
         || left.scrollWidth > left.clientWidth + 1
       );
       apply(fs);
@@ -495,16 +517,13 @@
       }
       height = this._abbrevMeasure(height, 'height');
       mass = this._abbrevMeasure(mass, 'mass');
-      // Short labels: Press Start 2P cannot afford "Height: "/"Mass: " padding.
-      if (!/^h:/i.test(height) && !/^height:/i.test(height)) height = 'H: ' + height;
-      else height = height.replace(/^height:\s*/i, 'H: ');
-      if (!/^m:/i.test(mass) && !/^mass:/i.test(mass)) mass = 'M: ' + mass;
-      else mass = mass.replace(/^mass:\s*/i, 'M: ');
+      height = height.replace(/^(h|height|weight)\s*:\s*/i, '');
+      mass = mass.replace(/^(m|mass)\s*:\s*/i, '');
       return {
         credit: user,
-        type: 'Type: ' + kind,
-        height,
-        mass,
+        type: 'type: ' + kind,
+        height: 'weight: ' + height,
+        mass: 'mass: ' + mass,
       };
     }
 
@@ -624,14 +643,15 @@
       const drawBox = (box, text) => {
         if (!text || !box) return;
         ctx.fillStyle = box.color || '#222';
-        const faceFont = (layout.FACE_FONT) || '"Press Start 2P", "Courier New", monospace';
+        const faceFont = this._faceFontForBox(box);
         ctx.font = `${box.fontWeight || '400'} ${(box.fontSize || 14) * scale}px ${faceFont}`;
         const align = box.align === 'center' ? 'center' : (box.align === 'right' ? 'right' : 'left');
         ctx.textAlign = align;
         let x = box.x * scale;
         if (align === 'center') x = (box.x + (box.w || 0) / 2) * scale;
         if (align === 'right') x = (box.x + (box.w || 0)) * scale;
-        const y = (box.y + (box.fontSize || 14)) * scale;
+        const boxH = (box.h || (box.fontSize || 14) * 1.2) * scale;
+        const y = box.y * scale + boxH * 0.72;
         if ((box.maxLines || 1) > 1) {
           ctx.textAlign = 'left';
           wrapText(ctx, text, box.x * scale, y, (box.w || 400) * scale, (box.fontSize || 14) * 1.25 * scale, box.maxLines);
@@ -653,30 +673,14 @@
       if (layout.POWER) {
         const pTitle = this.powerEl.dataset.powerTitle || '';
         const pValue = this.powerEl.dataset.powerValue || '';
-        if (pValue) {
-          drawBox(Object.assign({}, layout.POWER, { align: 'left', w: Math.round(layout.POWER.w * 0.62) }), pTitle);
-          drawBox(Object.assign({}, layout.POWER, {
-            align: 'right',
-            x: layout.POWER.x,
-            w: layout.POWER.w,
-          }), pValue);
-        } else {
-          drawBox(layout.POWER, pTitle || this.powerEl.textContent);
-        }
+        const powerLine = pValue ? (pTitle + '  ' + pValue).trim() : (pTitle || this.powerEl.textContent);
+        drawBox(layout.POWER, powerLine);
       }
       if (layout.ABILITY) {
         const aTitle = this.abilityEl.dataset.abilityTitle || '';
         const aValue = this.abilityEl.dataset.abilityValue || '';
-        if (aValue) {
-          drawBox(Object.assign({}, layout.ABILITY, { align: 'left', w: Math.round(layout.ABILITY.w * 0.62) }), aTitle);
-          drawBox(Object.assign({}, layout.ABILITY, {
-            align: 'right',
-            x: layout.ABILITY.x,
-            w: layout.ABILITY.w,
-          }), aValue);
-        } else {
-          drawBox(layout.ABILITY, aTitle || this.abilityEl.textContent);
-        }
+        const abilityLine = aValue ? (aTitle + '  ' + aValue).trim() : (aTitle || this.abilityEl.textContent);
+        drawBox(layout.ABILITY, abilityLine);
       }
       drawBox(layout.HP, this.hpEl.textContent);
       (layout.STATS || []).forEach((s) => {
