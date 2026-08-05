@@ -47,7 +47,7 @@ $staticMessage = null;
 $staticSuggestions = [];
 $autoRender = false;
 
-$greetingMessage = "Oh. A visitor. I'm Cardy. These printers make trading cards of whoever we invent aboard this ship. Want to make one with me?";
+$greetingMessage = "Oh. A visitor. I'm Cardy. I run Card-o-Bot aboard this ship: we invent someone together, then I print them onto a trading card. Want to make one with me?";
 $greetingSuggestions = ['Yeah, make a card', 'Make a detailed one', 'Just chat for now'];
 
 switch ($action) {
