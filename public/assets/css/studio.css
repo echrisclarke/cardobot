@@ -53,13 +53,15 @@
 }
 
 .studio-art-wrap {
+  /* Fallback square well; card-studio.js overwrites from CardLayout.ART. */
   position: absolute;
-  left: 7.9%;
+  left: 10.4%;
   top: 11.25%;
-  width: 84.2%;
-  height: 63.75%;
+  width: 79.2%;
+  height: 60%;
   z-index: 2;
   overflow: hidden;
+  border-radius: 0.55rem;
 }
 
 .studio-art {

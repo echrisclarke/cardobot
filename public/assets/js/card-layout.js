@@ -52,7 +52,13 @@
       warm_cargo: { h: 28, s: 40, l: 40 },
       deep_cyan: { h: 188, s: 55, l: 34 },
     },
-    ART: { x: sx(27), y: sy(56), w: sx(303), h: sy(303) },
+    // Square art well; bottom stays above the printed "i" cutout (~y 575).
+    ART: (() => {
+      const y = sy(56);
+      const side = Math.min(sy(300), 572 - y);
+      const x = Math.round((CARD_W - side) / 2);
+      return { x, y, w: side, h: side };
+    })(),
     NICKNAME: {
       // Vertically centered in the light name well; width leaves room for HP tab
       x: sx(36), y: sy(26), w: sx(230), h: sy(24),
@@ -123,11 +129,12 @@
     ],
   };
 
+  // Keep studio art wrap identical to ART (square, clear of the i-dot hole).
   CardLayout.ART_STUDIO = {
-    x: Math.round(CARD_W * 0.079),
-    y: Math.round(CARD_H * 0.1125),
-    w: Math.round(CARD_W * 0.842),
-    h: Math.round(CARD_H * 0.6375),
+    x: CardLayout.ART.x,
+    y: CardLayout.ART.y,
+    w: CardLayout.ART.w,
+    h: CardLayout.ART.h,
   };
 
   global.CardobotLayout = CardLayout;

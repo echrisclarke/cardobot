@@ -6,7 +6,7 @@
 
   const L = () => global.CardobotLayout || {
     CARD_W: 606, CARD_H: 800,
-    ART_STUDIO: { x: 48, y: 90, w: 510, h: 510 },
+    ART_STUDIO: { x: 63, y: 90, w: 480, h: 480 },
     NICKNAME: { x: 80, y: 48, fontSize: 32, color: '#585858' },
     BIO: { x: 120, y: 616, w: 430, fontSize: 14, color: 'rgba(44,127,162,1)', maxLines: 4 },
     POWER: { x: 277, y: 710, fontSize: 14, color: 'rgba(218,239,237,0.9)' },
@@ -53,6 +53,15 @@
 
       this.artWrap = document.createElement('div');
       this.artWrap.className = 'studio-art-wrap';
+      const artBox = layout.ART_STUDIO || layout.ART;
+      if (artBox) {
+        const W = layout.CARD_W;
+        const H = layout.CARD_H;
+        this.artWrap.style.left = ((artBox.x / W) * 100).toFixed(2) + '%';
+        this.artWrap.style.top = ((artBox.y / H) * 100).toFixed(2) + '%';
+        this.artWrap.style.width = ((artBox.w / W) * 100).toFixed(2) + '%';
+        this.artWrap.style.height = ((artBox.h / H) * 100).toFixed(2) + '%';
+      }
       this.artEl = document.createElement('img');
       this.artEl.className = 'studio-art';
       this.artEl.alt = 'Card art';

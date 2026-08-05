@@ -12,6 +12,7 @@ function cardobot_house_art_style(): string {
         . 'Opaque gouache / poster paint on warm tooth paper, matte finish, soft vignette, '
         . 'chunky brush tips with visible paint thickness and odd handmade quirkiness. '
         . 'Imperfect on purpose: uneven coverage, slight wonky proportions, charming mistakes welcome; not polished, not perfect, not concept-art clean. '
+        . 'Full color freedom: any hues the scene needs; do not restrict to a fixed or limited palette. '
         . 'Approachable and friendly without babyish mascot energy. '
         . 'Expression and cuteness follow the character only; no default smiles or sparkle-eyed plush look. '
         . 'LINEWORK: outlines shift color as they travel (picking up neighboring paint), not one flat ink color everywhere; '
@@ -89,7 +90,7 @@ function build_render_prompt(array $concept, array $memoryHints = []): string {
         $parts[] = 'Portray a boat-bot character on a water world if that is what they described';
     }
 
-    $parts[] = 'Square 1:1 composition, the subject fills the scene';
+    $parts[] = 'Strict 1:1 square image. Subject fills edge to edge with no letterboxing, borders, or empty margins';
     $parts[] = 'CRITICAL: the image must contain absolutely no text of any kind. '
         . 'No titles, names, captions, labels, UI, logos, watermarks, letters, digits, or writing anywhere in the art. '
         . 'No card frame. Pure illustration only';
