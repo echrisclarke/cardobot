@@ -269,9 +269,9 @@ body.chat-page .chat-messages.show-cardy-bg {
 <div class="wizard-studio-panel" id="studioPanel">
     <div id="studioRoot"></div>
     <div class="reveal-actions" id="studioActions">
-        <button type="button" id="studioSaveBtn">Save card</button>
-        <button type="button" class="secondary" id="studioDownloadBtn">Download PNG</button>
-        <button type="button" class="secondary" id="studioBackBtn">Back to chat</button>
+        <button type="button" id="studioSaveBtn" data-i18n="studio.save">Save card</button>
+        <button type="button" class="secondary" id="studioDownloadBtn" data-i18n="studio.download">Download PNG</button>
+        <button type="button" class="secondary" id="studioBackBtn" data-i18n="studio.back_chat">Back to chat</button>
     </div>
 </div>
 
@@ -388,6 +388,11 @@ body.chat-page .chat-messages.show-cardy-bg {
             const key = el.getAttribute('data-i18n-placeholder');
             if (!key) return;
             el.setAttribute('placeholder', t(key, el.getAttribute('placeholder') || ''));
+        });
+        document.querySelectorAll('[data-i18n-aria]').forEach((el) => {
+            const key = el.getAttribute('data-i18n-aria');
+            if (!key) return;
+            el.setAttribute('aria-label', t(key, el.getAttribute('aria-label') || ''));
         });
         document.querySelectorAll('[data-i18n-label]').forEach((el) => {
             const key = el.getAttribute('data-i18n-label');
