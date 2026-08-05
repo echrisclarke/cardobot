@@ -6,7 +6,7 @@
 
   const L = () => global.CardobotLayout || {
     CARD_W: 606, CARD_H: 800,
-    ART_STUDIO: { x: 55, y: 77, w: 496, h: 496 },
+    ART_STUDIO: { x: 45, y: 77, w: 515, h: 491 },
     NICKNAME: { x: 80, y: 48, fontSize: 32, color: '#585858' },
     BIO: { x: 120, y: 616, w: 430, fontSize: 14, color: 'rgba(44,127,162,1)', maxLines: 4 },
     POWER: { x: 277, y: 710, fontSize: 14, color: 'rgba(218,239,237,0.9)' },

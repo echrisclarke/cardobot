@@ -52,12 +52,13 @@
       warm_cargo: { h: 28, s: 40, l: 40 },
       deep_cyan: { h: 188, s: 55, l: 34 },
     },
-    // Square art well: fill the printed window; bottom clears the "i" cutout (~y 575).
+    // Art well: 85% card width fills the printed window; bottom clears the "i" (~y 575).
     ART: (() => {
+      const w = Math.round(CARD_W * 0.85);
+      const x = Math.round((CARD_W - w) / 2);
       const y = sy(48);
-      const side = Math.min(sx(322), 568 - y);
-      const x = Math.round((CARD_W - side) / 2);
-      return { x, y, w: side, h: side };
+      const h = Math.min(w, 568 - y);
+      return { x, y, w, h };
     })(),
     // Sizes are px at CARD_W (606). Display scales from card width in studio.
     NICKNAME: {

@@ -54,11 +54,11 @@
 }
 
 .studio-art-wrap {
-  /* Fallback square well; card-studio.js overwrites from CardLayout.ART. */
+  /* Fallback; card-studio.js overwrites from CardLayout.ART (85% width). */
   position: absolute;
-  left: 8.5%;
+  left: 7.5%;
   top: 9.5%;
-  width: 83%;
+  width: 85%;
   height: 62%;
   z-index: 2;
   overflow: hidden;
