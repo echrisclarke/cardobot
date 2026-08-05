@@ -702,8 +702,67 @@ function i18n_predict_locale(int $userId, ?array $navigatorLanguages = null): st
 }
 
 /**
+ * Find a named UI language inside free text (longest name wins).
+ */
+function i18n_named_language_in_text(string $raw): ?string {
+    $low = mb_strtolower(trim($raw));
+    if ($low === '') {
+        return null;
+    }
+    $chipMap = [
+        'mandarin chinese' => 'zh-Hans',
+        'simplified chinese' => 'zh-Hans',
+        'mandarin' => 'zh-Hans',
+        'chinese' => 'zh-Hans',
+        'english' => 'en',
+        'inglés' => 'en',
+        'ingles' => 'en',
+        'spanish' => 'es',
+        'español' => 'es',
+        'espanol' => 'es',
+        'french' => 'fr',
+        'français' => 'fr',
+        'francais' => 'fr',
+        'german' => 'de',
+        'deutsch' => 'de',
+        'japanese' => 'ja',
+        'portuguese' => 'pt-BR',
+        'português' => 'pt-BR',
+        'portugues' => 'pt-BR',
+        'korean' => 'ko',
+        'italian' => 'it',
+        'italiano' => 'it',
+        '中文' => 'zh-Hans',
+        '普通话' => 'zh-Hans',
+        '英文' => 'en',
+        '英语' => 'en',
+        '西班牙语' => 'es',
+        '法语' => 'fr',
+        '德语' => 'de',
+        '日语' => 'ja',
+        '日本語' => 'ja',
+        '한국어' => 'ko',
+    ];
+    $best = null;
+    $bestLen = 0;
+    foreach ($chipMap as $name => $code) {
+        $nameLow = mb_strtolower($name);
+        if (str_contains($low, $nameLow) || str_contains($raw, $name)) {
+            $len = mb_strlen($name);
+            if ($len > $bestLen) {
+                $best = $code;
+                $bestLen = $len;
+            }
+        }
+    }
+    return $best;
+}
+
+/**
  * Detect mid-chat "change language" intent.
  * Returns ['intent' => bool, 'target' => ?string] where target is a locale code if named.
+ *
+ * Requires a clear language-switch frame. Bare "switch to a bigger robot" must NOT match.
  */
 function i18n_detect_change_language_intent(string $message): array {
     $raw = trim($message);
@@ -711,55 +770,58 @@ function i18n_detect_change_language_intent(string $message): array {
         return ['intent' => false, 'target' => null];
     }
     $low = mb_strtolower($raw);
+    $named = i18n_named_language_in_text($raw);
 
-    $phrases = [
-        'change language', 'switch language', 'switch to', 'change to',
-        'set language', 'use spanish', 'use english', 'use chinese', 'use mandarin',
-        'hablar en', 'cambiar idioma', 'cambiar lengua', 'en español', 'en espanol',
-        '换成', '换语言', '切换语言', '改成中文', '用中文', '用法语',
-        'changer de langue', 'parler en', 'sprache wechseln', 'auf deutsch',
-        '言語を', '言語変更', '언어 변경', 'mudar idioma', 'cambia lingua',
-    ];
-    $intent = false;
-    foreach ($phrases as $p) {
-        if (str_contains($low, $p)) {
-            $intent = true;
-            break;
-        }
-    }
-    // Bare "language?" / "idioma?" after some progress is weak; require stronger cue.
-    if (!$intent && (preg_match('/\b(language|idioma|langue|sprache|语言|言語|언어)\b/u', $low)
-        && preg_match('/\b(change|switch|set|cambiar|changer|wechseln|换成|切换|change|mudar|cambia)\b/u', $low))) {
-        $intent = true;
-    }
-    if (!$intent) {
-        return ['intent' => false, 'target' => null];
+    // "back to english", "switch to Spanish", "change to 中文", "return to english"
+    if ($named !== null && preg_match(
+        '/\b(?:back|switch|change|return|go)\s+to\b/u',
+        $low
+    )) {
+        return ['intent' => true, 'target' => $named];
     }
 
-    // Try to extract a named target language from the message.
-    $chipMap = [
-        'english' => 'en', 'inglés' => 'en', 'ingles' => 'en',
-        'spanish' => 'es', 'español' => 'es', 'espanol' => 'es',
-        'chinese' => 'zh-Hans', 'mandarin' => 'zh-Hans', '中文' => 'zh-Hans', '普通话' => 'zh-Hans',
-        'french' => 'fr', 'français' => 'fr', 'francais' => 'fr',
-        'german' => 'de', 'deutsch' => 'de',
-        'japanese' => 'ja', '日本語' => 'ja',
-        'portuguese' => 'pt-BR', 'português' => 'pt-BR', 'portugues' => 'pt-BR',
-        'korean' => 'ko', '한국어' => 'ko',
-        'italian' => 'it', 'italiano' => 'it',
+    // "speak english", "talk in spanish", "write in chinese", "use english"
+    if ($named !== null && preg_match(
+        '/\b(?:speak|talk|write|use|set)\s+(?:in\s+|the\s+language\s+)?/u',
+        $low
+    )) {
+        return ['intent' => true, 'target' => $named];
+    }
+
+    // Short chips / typed lines that are only a language name (or "… please").
+    if ($named !== null && preg_match(
+        '/^(?:please\s+)?(?:english|inglés|ingles|spanish|español|espanol|chinese|mandarin|中文|普通话|英文|英语|french|français|francais|german|deutsch|japanese|日本語|portuguese|português|korean|한국어|italian|italiano)(?:\s+please)?[.!?…]*$/iu',
+        trim($raw)
+    )) {
+        return ['intent' => true, 'target' => $named];
+    }
+
+    // Explicit "change language" / multilingual equivalents (may omit target).
+    $barePhrases = [
+        'change language', 'switch language', 'set language', 'another language',
+        'hablar en', 'cambiar idioma', 'cambiar lengua',
+        '换成', '换语言', '切换语言', '改回', '改成中文', '用中文', '用英语', '用英文', '用法语',
+        'changer de langue', 'sprache wechseln',
+        '言語を変', '言語変更', '언어 변경', 'mudar idioma', 'cambia lingua',
     ];
-    foreach ($chipMap as $name => $code) {
-        if (str_contains($low, $name) || str_contains($raw, $name)) {
-            return ['intent' => true, 'target' => $code];
+    foreach ($barePhrases as $p) {
+        if (str_contains($low, $p) || str_contains($raw, $p)) {
+            return ['intent' => true, 'target' => $named];
         }
     }
-    // "switch to fr" / "change to de"
-    if (preg_match('/\b(?:to|a|en|auf|zu|para|in)\s+([a-z]{2,3}(?:-[A-Za-z0-9]+)?)\b/u', $low, $m)) {
+
+    if (preg_match('/\b(language|idioma|langue|sprache|语言|言語|언어)\b/u', $low)
+        && preg_match('/\b(change|switch|set|cambiar|changer|wechseln|换成|切换|mudar|cambia|back)\b/u', $low)) {
+        return ['intent' => true, 'target' => $named];
+    }
+
+    // "switch to fr" / "change to de" (code only, after a switch frame)
+    if (preg_match('/\b(?:back|switch|change|return|go)\s+to\s+([a-z]{2,3}(?:-[A-Za-z0-9]+)?)\b/u', $low, $m)) {
         $matched = i18n_match_language_tag($m[1]);
         if ($matched) {
             return ['intent' => true, 'target' => $matched];
         }
     }
 
-    return ['intent' => true, 'target' => null];
+    return ['intent' => false, 'target' => null];
 }

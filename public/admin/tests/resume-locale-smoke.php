@@ -24,11 +24,17 @@ expect(i18n_predict_locale(0, ['de-DE']) === 'de', 'predict navigator de');
 $c = i18n_detect_change_language_intent('please switch to Spanish');
 expect(!empty($c['intent']) && ($c['target'] ?? '') === 'es', 'change intent spanish');
 
+$cBack = i18n_detect_change_language_intent('back to english');
+expect(!empty($cBack['intent']) && ($cBack['target'] ?? '') === 'en', 'back to english');
+
 $c2 = i18n_detect_change_language_intent('cambiar idioma');
 expect(!empty($c2['intent']) && empty($c2['target']), 'change intent bare');
 
 $c3 = i18n_detect_change_language_intent('make a robot with lasers');
 expect(empty($c3['intent']), 'no false change intent');
+
+$c4 = i18n_detect_change_language_intent('switch to a bigger robot');
+expect(empty($c4['intent']), 'no false switch-to-object');
 
 expect(str_contains(i18n_t('lang.confirm', 'en', ['language' => 'English']), 'English'), 'lang.confirm');
 expect(I18N_CATALOG_VERSION >= 2, 'catalog version bumped');

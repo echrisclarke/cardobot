@@ -453,6 +453,41 @@ body.chat-page .chat-messages.show-cardy-bg {
         return null;
     }
 
+    /** Mid-chat language switch chips / typed lines (mirrors server intent). */
+    function languageSwitchTargetFromText(text) {
+        const raw = String(text || '').trim();
+        if (!raw) return null;
+        const lower = raw.toLowerCase();
+        const names = [
+            ['mandarin', 'zh-Hans'], ['chinese', 'zh-Hans'], ['中文', 'zh-Hans'], ['普通话', 'zh-Hans'],
+            ['english', 'en'], ['inglés', 'en'], ['ingles', 'en'], ['英文', 'en'], ['英语', 'en'],
+            ['spanish', 'es'], ['español', 'es'], ['espanol', 'es'], ['西班牙语', 'es'],
+            ['french', 'fr'], ['français', 'fr'], ['francais', 'fr'], ['法语', 'fr'],
+            ['german', 'de'], ['deutsch', 'de'], ['德语', 'de'],
+            ['japanese', 'ja'], ['日本語', 'ja'], ['日语', 'ja'],
+            ['portuguese', 'pt-BR'], ['português', 'pt-BR'], ['portugues', 'pt-BR'],
+            ['korean', 'ko'], ['한국어', 'ko'],
+            ['italian', 'it'], ['italiano', 'it'],
+        ];
+        let named = null;
+        for (const [name, code] of names) {
+            if (lower.includes(name.toLowerCase()) || raw.includes(name)) {
+                named = code;
+                break;
+            }
+        }
+        if (!named) return null;
+        if (/\b(back|switch|change|return|go)\s+to\b/.test(lower)) return named;
+        if (/\b(speak|talk|write|use|set)\s+(in\s+|the\s+)?/.test(lower)) return named;
+        if (/^(english|inglés|ingles|spanish|español|espanol|chinese|mandarin|中文|普通话|英文|英语|french|français|francais|german|deutsch|japanese|日本語|portuguese|português|korean|한국어|italian|italiano)(\s+please)?[.!?…]*$/i.test(raw)) {
+            return named;
+        }
+        if (/(change language|switch language|cambiar idioma|换语言|切换语言|改回|changer de langue)/i.test(raw)) {
+            return named;
+        }
+        return null;
+    }
+
     function isConfirmYesChip(text) {
         const lower = String(text || '').toLowerCase().trim();
         const yes = t('lang.confirm_yes', 'Yes').toLowerCase();
@@ -1355,6 +1390,15 @@ body.chat-page .chat-messages.show-cardy-bg {
         const step = state.step;
         const lower = text.toLowerCase();
 
+        // "back to english" etc. must never fall into card agenda.
+        if (state.localePicked && !state.awaitingLocaleConfirm) {
+            const switchTo = languageSwitchTargetFromText(text);
+            if (switchTo) {
+                sendChat({ action: 'select_locale', value: switchTo, user_message: text });
+                return;
+            }
+        }
+
         if (state.awaitingLanguageSwitch) {
             const code = localeCodeFromChip(text);
             if (code === 'other') {
@@ -1462,6 +1506,13 @@ body.chat-page .chat-messages.show-cardy-bg {
         appendUserMessage(text);
 
         const step = state.step;
+        if (state.localePicked && !state.awaitingLocaleConfirm) {
+            const switchTo = languageSwitchTargetFromText(text);
+            if (switchTo) {
+                sendChat({ action: 'select_locale', value: switchTo, user_message: text });
+                return;
+            }
+        }
         if (state.awaitingLanguageSwitch) {
             const code = localeCodeFromChip(text);
             if (code && code !== 'other') {
