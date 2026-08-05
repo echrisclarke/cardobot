@@ -109,9 +109,16 @@ switch ($action) {
         }
         i18n_set_session_locale($pack['code']);
         i18n_save_user_locale($userId, $pack['code']);
+        // Update active chat session even if client omitted session_id (menu switch).
+        if (!is_array($session) && $userId > 0) {
+            $session = cardy_session_load_for_user($userId);
+        }
         if (is_array($session)) {
             $session['locale'] = $pack['code'];
             $session['locale_picked'] = true;
+            $session['awaiting_locale_confirm'] = false;
+            $session['awaiting_language_switch'] = false;
+            $session['awaiting_other_locale'] = false;
             cardy_session_save($session);
         }
         api_json([
@@ -121,12 +128,13 @@ switch ($action) {
             'name_native' => $pack['name_native'],
             'status' => $pack['status'],
             'strings' => $pack['strings'],
-            'message' => i18n_t('lang.set', $pack['code']),
+            'message' => i18n_t('lang.changed', $pack['code'], ['language' => i18n_locale_native_name($pack['code'])]),
             'path_suggestions' => [
                 i18n_t('path.fast', $pack['code']),
                 i18n_t('path.long', $pack['code']),
                 i18n_t('path.form', $pack['code']),
                 i18n_t('path.chat', $pack['code']),
+                i18n_t('lang.change_chip', $pack['code']),
             ],
         ]);
         break;

@@ -11,6 +11,7 @@ return [
     'nav.terms' => 'Términos',
     'nav.admin' => 'Admin',
     'nav.menu' => 'Menú',
+    'nav.language' => 'Idioma',
     'studio.paint' => 'Pintar mi carta',
     'studio.save' => 'Guardar carta',
     'studio.download' => 'Descargar PNG',

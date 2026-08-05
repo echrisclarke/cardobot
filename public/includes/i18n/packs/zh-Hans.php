@@ -11,6 +11,7 @@ return [
     'nav.terms' => '条款',
     'nav.admin' => '管理',
     'nav.menu' => '菜单',
+    'nav.language' => '语言',
     'studio.paint' => '绘制我的卡牌',
     'studio.save' => '保存卡牌',
     'studio.download' => '下载 PNG',

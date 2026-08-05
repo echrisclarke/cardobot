@@ -3,7 +3,7 @@
  * English UI string catalog (source of truth).
  * Bump I18N_CATALOG_VERSION when keys are added so missing locales fill new keys only.
  */
-const I18N_CATALOG_VERSION = 4;
+const I18N_CATALOG_VERSION = 5;
 
 function i18n_catalog_en(): array {
     return [
@@ -18,6 +18,7 @@ function i18n_catalog_en(): array {
         'nav.terms' => 'Terms',
         'nav.admin' => 'Admin',
         'nav.menu' => 'Menu',
+        'nav.language' => 'Language',
 
         'studio.paint' => 'Paint my card',
         'studio.save' => 'Save card',

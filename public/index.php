@@ -568,6 +568,7 @@ body.chat-page .chat-messages.show-cardy-bg {
     // ============================================================
     function applyBootPayload(data) {
         state.sessionId = data.session_id;
+        window.cardobotSessionId = data.session_id || null;
         state.step = data.step || state.step;
         state.mode = data.mode || null;
         state.path = data.path || null;
@@ -1595,6 +1596,7 @@ body.chat-page .chat-messages.show-cardy-bg {
         try {
             const data = await postJson(basePath + '/api/chat.php', body);
             state.sessionId     = data.session_id || state.sessionId;
+            window.cardobotSessionId = state.sessionId;
             state.step          = data.step || state.step;
             state.mode          = data.mode || state.mode;
             state.path          = data.path || state.path;

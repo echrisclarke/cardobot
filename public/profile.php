@@ -95,23 +95,33 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     } elseif ($action === 'set_locale') {
         require_once __DIR__ . '/includes/i18n.php';
+        require_once __DIR__ . '/includes/state.php';
         $code = trim((string)($_POST['preferred_locale'] ?? 'en'));
         $raw = trim((string)($_POST['other_language'] ?? ''));
+        $pack = null;
         if ($code === 'other' && $raw !== '') {
             $validated = i18n_validate_language($raw);
             if (!empty($validated['ok'])) {
                 $pack = i18n_ensure_locale($validated['code'], $validated['name_en'], $validated['name_native']);
-                i18n_set_session_locale($pack['code']);
-                i18n_save_user_locale((int)$userId, $pack['code']);
-                $success = 'Language saved.';
             } else {
                 $error = $validated['message'] ?? 'That language is not available.';
             }
         } else {
             $pack = i18n_ensure_locale($code);
+        }
+        if (is_array($pack) && !empty($pack['code'])) {
             i18n_set_session_locale($pack['code']);
             i18n_save_user_locale((int)$userId, $pack['code']);
-            $success = 'Language saved.';
+            $activeChat = cardy_session_load_for_user((int)$userId);
+            if (is_array($activeChat)) {
+                $activeChat['locale'] = $pack['code'];
+                $activeChat['locale_picked'] = true;
+                $activeChat['awaiting_locale_confirm'] = false;
+                $activeChat['awaiting_language_switch'] = false;
+                $activeChat['awaiting_other_locale'] = false;
+                cardy_session_save($activeChat);
+            }
+            $success = i18n_t('profile.saved', $pack['code']);
         }
         $user = get_user_by_id((int)$userId) ?: $user;
         $activeTab = 'profile';
@@ -478,6 +488,43 @@ $assetPath = get_asset_path();
                     <h2>👤 Profile Information</h2>
                 </div>
                 <div class="card-body">
+                    <?php
+                    $profileLoc = i18n_session_locale();
+                    $currentLocale = i18n_normalize_code((string)($user['preferred_locale'] ?? $profileLoc ?: 'en')) ?: 'en';
+                    ?>
+                    <section id="language" style="scroll-margin-top: 1.5rem;">
+                        <h3 style="margin-bottom: var(--spacing-4);"><?php echo htmlspecialchars(i18n_t('nav.language', $profileLoc), ENT_QUOTES, 'UTF-8'); ?></h3>
+                        <p class="text-muted" style="margin-bottom: var(--spacing-4); color: var(--color-text-secondary);">
+                            <?php echo htmlspecialchars(i18n_t('profile.language_help', $profileLoc), ENT_QUOTES, 'UTF-8'); ?>
+                        </p>
+                        <form method="POST" class="profile-form">
+                            <input type="hidden" name="action" value="set_locale">
+                            <div class="form-group">
+                                <label for="preferred_locale"><?php echo htmlspecialchars(i18n_t('nav.language', $profileLoc), ENT_QUOTES, 'UTF-8'); ?></label>
+                                <select id="preferred_locale" name="preferred_locale" class="form-control">
+                                    <?php foreach (I18N_PRESET_LOCALES as $pCode => $meta): ?>
+                                        <option value="<?php echo htmlspecialchars($pCode); ?>" <?php echo $currentLocale === $pCode ? 'selected' : ''; ?>>
+                                            <?php echo htmlspecialchars($meta['name_native'] . ' (' . $meta['name_en'] . ')'); ?>
+                                        </option>
+                                    <?php endforeach; ?>
+                                    <option value="other" <?php echo !isset(I18N_PRESET_LOCALES[$currentLocale]) ? 'selected' : ''; ?>><?php echo htmlspecialchars(i18n_t('lang.other', $profileLoc), ENT_QUOTES, 'UTF-8'); ?></option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="other_language"><?php echo htmlspecialchars(i18n_t('lang.other', $profileLoc), ENT_QUOTES, 'UTF-8'); ?></label>
+                                <input type="text" id="other_language" name="other_language" class="form-control" maxlength="80"
+                                       placeholder="<?php echo htmlspecialchars(i18n_t('lang.other_placeholder', $profileLoc), ENT_QUOTES, 'UTF-8'); ?>"
+                                       value="<?php echo !isset(I18N_PRESET_LOCALES[$currentLocale]) ? htmlspecialchars($currentLocale) : ''; ?>">
+                                <small class="form-help"><?php echo htmlspecialchars(i18n_t('lang.other_prompt', $profileLoc), ENT_QUOTES, 'UTF-8'); ?></small>
+                            </div>
+                            <div class="form-actions">
+                                <button type="submit" class="btn btn-primary"><?php echo htmlspecialchars(i18n_t('profile.save', $profileLoc), ENT_QUOTES, 'UTF-8'); ?></button>
+                            </div>
+                        </form>
+                    </section>
+
+                    <hr style="margin: var(--spacing-6) 0; border: none; border-top: var(--border-width) solid var(--color-border);">
+
                     <form method="POST" class="profile-form" enctype="multipart/form-data">
                         <input type="hidden" name="action" value="change_username">
                         
@@ -489,40 +536,6 @@ $assetPath = get_asset_path();
                         
                         <div class="form-actions">
                             <button type="submit" class="btn btn-primary">Update Username</button>
-                        </div>
-                    </form>
-
-                    <hr style="margin: var(--spacing-6) 0; border: none; border-top: var(--border-width) solid var(--color-border);">
-
-                    <h3 style="margin-bottom: var(--spacing-4);">Language</h3>
-                    <p class="text-muted" style="margin-bottom: var(--spacing-4); color: var(--color-text-secondary);">
-                        Console and new cards use this language.
-                    </p>
-                    <?php
-                    $currentLocale = i18n_normalize_code((string)($user['preferred_locale'] ?? i18n_session_locale() ?: 'en')) ?: 'en';
-                    ?>
-                    <form method="POST" class="profile-form">
-                        <input type="hidden" name="action" value="set_locale">
-                        <div class="form-group">
-                            <label for="preferred_locale">Language</label>
-                            <select id="preferred_locale" name="preferred_locale" class="form-control">
-                                <?php foreach (I18N_PRESET_LOCALES as $pCode => $meta): ?>
-                                    <option value="<?php echo htmlspecialchars($pCode); ?>" <?php echo $currentLocale === $pCode ? 'selected' : ''; ?>>
-                                        <?php echo htmlspecialchars($meta['name_native'] . ' (' . $meta['name_en'] . ')'); ?>
-                                    </option>
-                                <?php endforeach; ?>
-                                <option value="other" <?php echo !isset(I18N_PRESET_LOCALES[$currentLocale]) ? 'selected' : ''; ?>>Other…</option>
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label for="other_language">Other language name</label>
-                            <input type="text" id="other_language" name="other_language" class="form-control" maxlength="80"
-                                   placeholder="e.g. Hindi, العربية, cy"
-                                   value="<?php echo !isset(I18N_PRESET_LOCALES[$currentLocale]) ? htmlspecialchars($currentLocale) : ''; ?>">
-                            <small class="form-help">Used when you pick Other. Real natural languages only.</small>
-                        </div>
-                        <div class="form-actions">
-                            <button type="submit" class="btn btn-primary">Save language</button>
                         </div>
                     </form>
                     
