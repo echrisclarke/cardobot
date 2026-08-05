@@ -118,8 +118,8 @@
         if (label === 'type' && !/^type:\s*/i.test(el.textContent.trim())) {
           fails.push('type missing "type:" label');
         }
-        if (label === 'height' && !/^weight:\s*/i.test(el.textContent.trim())) {
-          fails.push('height missing "weight:" label');
+        if (label === 'height' && !/^size:\s*/i.test(el.textContent.trim())) {
+          fails.push('height missing "size:" label');
         }
         if (label === 'mass' && !/^mass:\s*/i.test(el.textContent.trim())) {
           fails.push('mass missing "mass:" label');
