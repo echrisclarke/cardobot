@@ -34,6 +34,33 @@
       this._userTintLocked = false;
       this.showCredit = true;
       this._buildDom();
+      this._bindFaceResize();
+    }
+
+    /** Design font units → CSS px from live card width (cqw is unreliable under 3D transforms). */
+    _faceFontPx(designFs) {
+      const W = L().CARD_W || 606;
+      const cw = (this.card && this.card.clientWidth) || 303;
+      return Math.max(4, (Number(designFs) / W) * cw);
+    }
+
+    _applyFaceFontSize(el, designFs) {
+      if (!el) return;
+      el.style.fontSize = this._faceFontPx(designFs) + 'px';
+    }
+
+    _bindFaceResize() {
+      if (typeof ResizeObserver === 'undefined' || !this.card) return;
+      let timer = null;
+      this._faceResizeObs = new ResizeObserver(() => {
+        clearTimeout(timer);
+        timer = setTimeout(() => {
+          if (this.concept && Object.keys(this.concept).length) {
+            this.setConcept(this.concept, this.stats);
+          }
+        }, 80);
+      });
+      this._faceResizeObs.observe(this.card);
     }
 
     _buildDom() {
@@ -147,7 +174,7 @@
         box.w ? 'width:' + ((box.w / W) * 100).toFixed(2) + '%' : '',
         box.h ? 'height:' + ((box.h / H) * 100).toFixed(2) + '%' : '',
         'font-family:' + faceFont,
-        'font-size:calc(' + fs + ' / ' + W + ' * 100cqw)',
+        'font-size:' + this._faceFontPx(fs) + 'px',
         'font-weight:' + (box.fontWeight || '400'),
         'color:' + (box.color || '#222'),
         'line-height:' + (box.lineHeight || 1.15),
@@ -177,7 +204,6 @@
 
     _fitText(el, text, capFs) {
       const box = el._box || {};
-      const W = L().CARD_W;
       let base = box.fontSize || 14;
       if (capFs != null && capFs > 0) base = Math.min(base, capFs);
       const minFs = box.minFontSize != null ? box.minFontSize : 5;
@@ -192,7 +218,7 @@
       el.style.whiteSpace = multi ? 'normal' : 'nowrap';
 
       const apply = (size) => {
-        el.style.fontSize = 'calc(' + size + ' / ' + W + ' * 100cqw)';
+        this._applyFaceFontSize(el, size);
       };
       const overflows = () => multi
         ? (el.scrollHeight > el.clientHeight + 1 || el.scrollWidth > el.clientWidth + 1)
@@ -263,7 +289,6 @@
     _setNamedValueLine(el, title, value, titleKey, valueKey) {
       if (!el) return 0;
       const box = el._box || {};
-      const W = L().CARD_W;
       let titleText = title == null ? '' : String(title).trim();
       let valueText = value == null ? '' : String(value).trim();
       if (box.transform === 'uppercase') {
@@ -296,7 +321,7 @@
       const minFs = box.minFontSize != null ? box.minFontSize : 5;
       let fs = base;
       const apply = (size) => {
-        el.style.fontSize = 'calc(' + size + ' / ' + W + ' * 100cqw)';
+        this._applyFaceFontSize(el, size);
       };
       const overflows = () => (
         el.scrollWidth > el.clientWidth + 1
@@ -538,6 +563,7 @@
     async compositeDataUrl(scale) {
       scale = scale || 2;
       const layout = L();
+      await this._ensureFaceFont();
       const w = layout.CARD_W * scale;
       const h = layout.CARD_H * scale;
       const canvas = document.createElement('canvas');
