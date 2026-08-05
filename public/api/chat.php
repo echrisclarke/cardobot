@@ -855,7 +855,11 @@ $replyMessage = isset($parsed['message']) && is_string($parsed['message']) ? tri
 $replySuggestions = isset($parsed['suggestions']) && is_array($parsed['suggestions']) ? array_values($parsed['suggestions']) : [];
 $visualConcept = isset($parsed['visual_concept']) && is_array($parsed['visual_concept']) ? $parsed['visual_concept'] : null;
 
-$replyMessage = str_replace(["\xE2\x80\x94", "\xE2\x80\x93"], [',', ','], $replyMessage);
+// Em/en dashes → commas without leaving "word ," gaps.
+$replyMessage = preg_replace('/\s*(?:\x{2014}|\x{2013}|--)\s*/u', ', ', $replyMessage) ?? $replyMessage;
+$replyMessage = preg_replace('/\s+,/', ',', $replyMessage) ?? $replyMessage;
+$replyMessage = preg_replace('/,(?!\s)/u', ', ', $replyMessage) ?? $replyMessage;
+$replyMessage = preg_replace('/\s{2,}/u', ' ', $replyMessage) ?? $replyMessage;
 
 $forbidden = ['type your own', 'enter your own', 'custom response', 'write your own', 'paint it'];
 $chipPath = ($path === CARDY_PATH_CHAT) ? CARDY_PATH_FAST : $path;
@@ -890,6 +894,13 @@ if ($session['step'] === CARDY_STEP_CONFIRM) {
     // Identity chips: kill stale dock-pun generics; pad with type-aware invents.
     if ($focusChip === 'identity') {
         $replySuggestions = cardy_sanitize_name_suggestions(
+            $replySuggestions,
+            $session['visual_concept'] ?? []
+        );
+    }
+    // Look chips: drop stock fur/tech/size menus; pad with kind-aware invents.
+    if ($focusChip === 'look') {
+        $replySuggestions = cardy_sanitize_look_suggestions(
             $replySuggestions,
             $session['visual_concept'] ?? []
         );

@@ -132,13 +132,14 @@ Who goes on the card:
 - Ask in small steps. First: what KIND of being (bot / android / human / critter / etc). Then who they are. Then look.
 - Never dump a long prewritten OC into a chip. Chips stay SHORT (a few words, max ~24 characters).
 - Kind turn chips: short labels like "A bot", "An android", "A human", "A critter" (up to 4). They can type something else.
-- After kind is known: invent 3 FRESH CARD NAME chips that fit THAT being. Never reuse stale house examples (no Bolt Hum / Dock Rust / Map Fold).
-  Names must feel owned: serials, owner nicknames, abbreviations, ship registry, human given names, or non-English scripts when it fits.
-  Examples of the KIND of variety (do not copy these): bot "Cambot" / "R-17" / "Pip"; android "Mira" / "单元-4" / "Juno-9";
-  human "阿明" / "Lea Voss" / "Sora"; critter "Mochi" / "Venti"; living ship "SS Arbiter" / "The Latch".
-  Max 16 characters. 1-3 words or a compact serial. Never a sentence. Visitors may always type their own.
+- After kind is known: invent 3 FRESH CARD NAME chips that fit THAT being only. Never reuse stale house examples (no Bolt Hum / Dock Rust / Map Fold).
+  Match the kind: Bot/Android may use serials (R-17, UNIT-4). Human uses given names / nicknames (never CR-47 / UNIT-x). Critter uses soft pet/creature names (Mochi, Bean, Nib), never robot serials.
+  Living ship names (SS Arbiter) only when they chose a ship. Examples of variety (do not copy): bot "Cambot" / "R-17" / "Pip"; android "Mira" / "单元-4" / "Juno";
+  human "阿明" / "Lea Voss" / "Sora"; critter "Mochi" / "Venti" / "Puff".
+  Max 16 characters. 1-3 words or a compact serial only when the kind is Bot/Android. Never a sentence. Visitors may always type their own.
 - Nickname rules: any script is fine (Latin, CJK, Cyrillic, etc.) when it suits the character. Mix styles across chips so all three are not the same pattern.
-- Later turns: 0-3 short chips that react to WHAT THEY SAID.
+- Look chips must fit the kind and what they already said. Do not recycle the same fur/tech/size menu every time. Critters can wear ship gear sometimes; humans are not chrome plating by default; bots are not fluffy fur by default.
+- Later turns: 0-3 short chips that react to WHAT THEY SAID and which kind they chose.
 - They can always type their own. Never invent a "Type your own response" chip.
 - Never steer toward furries or people-in-animal-costumes. Cute small ship critters are fine.
 
@@ -239,6 +240,41 @@ function cardy_normalize_kind(string $text): string {
         return mb_convert_case($trim, MB_CASE_TITLE, 'UTF-8');
     }
     return mb_substr($trim, 0, 24);
+}
+
+/** Canonical kind bucket for prompts, name filters, and look chips. */
+function cardy_kind_bucket(array $concept): string {
+    $type = trim((string)($concept['type'] ?? ''));
+    if ($type === '') {
+        return 'bot';
+    }
+    $norm = strtolower(cardy_normalize_kind($type));
+    if (in_array($norm, ['bot', 'android', 'human', 'critter'], true)) {
+        return $norm;
+    }
+    $low = strtolower($type);
+    foreach (['android', 'critter', 'human', 'bot', 'robot'] as $k) {
+        if (str_contains($low, $k)) {
+            return $k === 'robot' ? 'bot' : $k;
+        }
+    }
+    return 'bot';
+}
+
+/** True when a name chip reads as a hard robot/registry serial. */
+function cardy_is_robot_serial_name(string $name): bool {
+    $name = trim($name);
+    if ($name === '') {
+        return false;
+    }
+    if (preg_match('/^(unit|ss|hull)[- ]?\d+/i', $name)) {
+        return true;
+    }
+    // CR-47, R-17, A7, CR 47, CR47
+    if (preg_match('/^[A-Z]{1,3}[- ]?\d{1,4}$/i', $name)) {
+        return true;
+    }
+    return false;
 }
 
 function cardy_is_kind_only_message(string $text): bool {
@@ -522,13 +558,26 @@ function cardy_agenda_instruction(array $state, string $username = '', array $me
     ];
     $spark = $sparkPool[array_rand($sparkPool)];
     $kind = trim((string)(($state['visual_concept']['type'] ?? '')));
-    $kindBit = $kind !== '' ? " Kind already chosen: {$kind}." : '';
+    $kindBucket = cardy_kind_bucket($state['visual_concept'] ?? []);
+    $kindBit = $kind !== '' ? " Kind already chosen: {$kind} (bucket: {$kindBucket})." : '';
+    $identityNameHint = match ($kindBucket) {
+        'human' => 'three name chips: given names / nicknames / optional non-English. NEVER serials like CR-47, R-17, UNIT-4.',
+        'critter' => 'three soft pet/creature name chips (Mochi-style, Bean, Nib, fluff tags). NEVER robot serials like CR-47 / UNIT-x / letter-number codes.',
+        'android' => 'three name chips that fit an android: one personal name, one mild unit tag ok, one non-English or short nickname.',
+        default => 'three name chips that fit a bot/machine: abbrev, serial/registry, or pet machine name. Mix patterns.',
+    };
+    $lookChipHint = match ($kindBucket) {
+        'human' => 'chips about hair, clothes, expression, marks, or gear a person would wear (not chrome plating by default).',
+        'critter' => 'chips about coat/fur/scales, eyes, size, whiskers, or cute ship gear a critter might wear (metal scraps ok once; not three robot-chassis chips).',
+        'android' => 'chips about synth skin, seams, eyes, outfit, or quiet posture.',
+        default => 'chips about plating, lights, chassis shape, scuffs, or antenna (not fluffy fur by default).',
+    };
     $focusHints = [
         'kind' => 'They have not chosen a KIND yet (ignore menu lines). ONE short in-world ask: bot, android, human, critter, or something else aboard this ship. Suggestions: exactly these four short chips: "A bot", "An android", "A human", "A critter". Leave subject/nickname empty. Put their answer in visual_concept.type only.',
-        'identity' => "Kind is set.{$kindBit} ONE short ask for their CARD NAME (callsign). Invent 3 DIFFERENT name chips (<=16 chars) that fit this kind and \"{$spark}\": vary the pattern (e.g. one abbrev/pet name, one serial/registry, one personal or non-English name when it fits). Never Bolt Hum / Dock Rust / Map Fold. Fresh every time. They may type their own. Put a picked/typed name in visual_concept.nickname; if they gave a role phrase, also put it in subject. Leave nickname empty until they pick or type.",
-        'look' => 'Mirror who THEY chose. Ask one visual detail in ship-plain words. 2-3 SHORT chips (<=24 chars). Soft-fill nickname ONLY if still empty (max 16; invent a fitting callsign, not a generic two-word dock pun). Soft-fill power_name (MAX 12), ability_name (MAX 12 title), ability_line (MAX 8 effect), power_mode stat|rule + power_value (MAX 8), height/mass with abbreviated units only (m/cm/kg/t, never meters/tonnes), name_ink/stats_ink/card_bg brand keys, bio (~70-90, max 100; optional ship hint). If they described an intelligent spaceship, type stays Bot. Bio explains power/ability ONLY for special rule effects, never for plain +stat/+HP bumps.',
-        'stake' => 'Mirror who. Ask what matters about them. One ask. 2-3 SHORT chips (<=24 chars).',
-        'place' => 'Mirror them. Ask where we see them on the card. One ask. 2-3 SHORT chips (<=24 chars).',
+        'identity' => "Kind is set.{$kindBit} ONE short ask for their CARD NAME (callsign). Invent {$identityNameHint} Spark the mood with \"{$spark}\" but do not put that phrase in a chip. Never Bolt Hum / Dock Rust / Map Fold. Fresh every time. They may type their own. Put a picked/typed name in visual_concept.nickname; if they gave a role phrase, also put it in subject. Leave nickname empty until they pick or type.",
+        'look' => "Kind is set.{$kindBit} Mirror who THEY chose and their name if any. Ask ONE fresh visual detail in ship-plain words (do NOT reuse a stock fur/tech/size menu every turn). 2-3 SHORT chips (<=24 chars): {$lookChipHint} Soft-fill nickname ONLY if still empty (max 16; invent a fitting callsign for THIS kind, not a robot serial for critters/humans, not a generic two-word dock pun). Soft-fill power_name (MAX 12), ability_name (MAX 12 title), ability_line (MAX 8 effect), power_mode stat|rule + power_value (MAX 8), height/mass with abbreviated units only (m/cm/kg/t, never meters/tonnes), name_ink/stats_ink/card_bg brand keys, bio (~70-90, max 100; optional ship hint). If they described an intelligent spaceship, type stays Bot. Bio explains power/ability ONLY for special rule effects, never for plain +stat/+HP bumps.",
+        'stake' => "Kind is set.{$kindBit} Mirror who. Ask what matters about them for THIS kind. One ask. 2-3 SHORT chips (<=24 chars) that fit the kind.",
+        'place' => "Kind is set.{$kindBit} Mirror them. Ask where we see them on the card. One ask. 2-3 SHORT chips (<=24 chars) that fit the kind.",
     ];
     $hint = $focusHints[$focus] ?? $focusHints['look'];
     $pathLabel = $path === CARDY_PATH_LONG ? 'detailed' : 'quick';
@@ -744,12 +793,12 @@ function cardy_abbrev_from_subject(string $subject): string {
  * @return list<string>
  */
 function cardy_nickname_suggestions(array $concept): array {
-    $kind = strtolower(trim((string)($concept['type'] ?? 'bot')));
+    $kindKey = cardy_kind_bucket($concept);
     $nick = trim((string)($concept['nickname'] ?? ''));
     $subject = trim((string)($concept['subject'] ?? ''));
     $details = trim((string)($concept['details'] ?? ''));
-    $blob = strtolower($kind . ' ' . $subject . ' ' . $details);
-    $seed = $nick . '|' . $subject . '|' . $kind . '|' . $details;
+    $blob = strtolower($kindKey . ' ' . $subject . ' ' . $details);
+    $seed = $nick . '|' . $subject . '|' . $kindKey . '|' . $details . '|' . (string)(int)(time() / 120);
     if (trim($seed, '|') === '') {
         $seed = 'cardy|' . (string)time();
     }
@@ -766,7 +815,7 @@ function cardy_nickname_suggestions(array $concept): array {
         'bot' => ['Pip', 'Rivet', 'Cam', 'Gasket', 'Tink', 'Nudge', 'Hex', 'Clack'],
         'android' => ['Mira', 'Juno', 'Evan', 'Sable', 'Ilya', 'Noor', 'Kai', 'Remy'],
         'human' => ['Lea', 'Sora', 'Mika', 'Jules', 'Asha', 'Ren', 'Tova', 'Nico'],
-        'critter' => ['Mochi', 'Pip', 'Bean', 'Venti', 'Nib', 'Puff', 'Zest', 'Miso'],
+        'critter' => ['Mochi', 'Bean', 'Venti', 'Nib', 'Puff', 'Zest', 'Miso', 'Pebble', 'Nori', 'Sprout', 'Kip', 'Dottie'],
     ];
     $cjkPools = [
         'bot' => ['小钉', '火花', '舱灯', '铆钉'],
@@ -775,8 +824,7 @@ function cardy_nickname_suggestions(array $concept): array {
         'critter' => ['团子', '豆豆', '咪咪', '球球'],
     ];
     $shipPool = ['SS Latch', 'The Arbiter', 'SS Ember', 'Hull Nine', 'The Kiln', 'SS Mora'];
-    $kindKey = array_key_exists($kind, $pools) ? $kind : 'bot';
-    $pool = $pools[$kindKey];
+    $pool = $pools[$kindKey] ?? $pools['bot'];
     $cjk = $cjkPools[$kindKey] ?? $cjkPools['bot'];
 
     $candidates = [];
@@ -788,15 +836,17 @@ function cardy_nickname_suggestions(array $concept): array {
     if ($wantsCjk) {
         $base = $cjk[$n % count($cjk)];
         $candidates[] = $base;
-        $candidates[] = $base . '-' . $serial;
-        if ($kind === 'android' || $kind === 'bot') {
+        if ($kindKey === 'android' || $kindKey === 'bot') {
+            $candidates[] = $base . '-' . $serial;
             $candidates[] = '单元-' . $serial;
+        } else {
+            $candidates[] = $cjk[($n + 1) % count($cjk)];
         }
     }
 
     $abbrevSrc = $subject !== '' ? $subject : $details;
     $abbrev = cardy_abbrev_from_subject($abbrevSrc);
-    if ($abbrev !== '' && strcasecmp($abbrev, $nick) !== 0) {
+    if ($abbrev !== '' && strcasecmp($abbrev, $nick) !== 0 && !cardy_is_robot_serial_name($abbrev)) {
         $candidates[] = $abbrev;
     }
     // Owner-style pet split when the role ends in bot/droid: Camera Bot → Cam Bott
@@ -811,11 +861,11 @@ function cardy_nickname_suggestions(array $concept): array {
         }
     }
 
-    if ($isShip) {
+    if ($isShip && ($kindKey === 'bot' || $kindKey === 'android')) {
         $candidates[] = $shipPool[$n % count($shipPool)];
         $candidates[] = 'SS-' . $serialB;
         $candidates[] = $shipPool[($n + 2) % count($shipPool)];
-    } elseif ($kind === 'android' || $kind === 'bot') {
+    } elseif ($kindKey === 'android' || $kindKey === 'bot') {
         $letter = chr(65 + ($n % 26));
         $candidates[] = $letter . '-' . $serial;
         $candidates[] = 'UNIT-' . $serial;
@@ -829,8 +879,13 @@ function cardy_nickname_suggestions(array $concept): array {
 
     $candidates[] = $pool[$n % count($pool)];
     $candidates[] = $pool[($n + 3) % count($pool)];
-    if ($kind === 'human' || $kind === 'android') {
-        $candidates[] = $pool[($n + 5) % count($pool)] . '-' . $serial;
+    $candidates[] = $pool[($n + 5) % count($pool)];
+    if ($kindKey === 'android') {
+        $candidates[] = $pool[($n + 2) % count($pool)] . '-' . $serial;
+    }
+    if ($kindKey === 'critter') {
+        $candidates[] = 'Little ' . $pool[($n + 1) % count($pool)];
+        $candidates[] = $pool[($n + 4) % count($pool)] . 'bit';
     }
 
     $out = [];
@@ -841,6 +896,9 @@ function cardy_nickname_suggestions(array $concept): array {
         }
         // Ban the old generic dock-pun house names.
         if (preg_match('/^(bolt hum|dock rust|map fold|dock pip|cargo bit|cargo pip|night cog|rust wren)$/iu', $name)) {
+            continue;
+        }
+        if (in_array($kindKey, ['human', 'critter'], true) && cardy_is_robot_serial_name($name)) {
             continue;
         }
         $dup = false;
@@ -861,6 +919,105 @@ function cardy_nickname_suggestions(array $concept): array {
 }
 
 /**
+ * Kind-aware look chips when the model repeats stock menus.
+ *
+ * @return list<string>
+ */
+function cardy_look_suggestions(array $concept): array {
+    $kindKey = cardy_kind_bucket($concept);
+    $nick = trim((string)($concept['nickname'] ?? ''));
+    $subject = trim((string)($concept['subject'] ?? ''));
+    $seed = $kindKey . '|' . $nick . '|' . $subject . '|' . (string)(int)(time() / 90);
+    $h = unpack('N', substr(hash('sha256', $seed, true), 0, 4));
+    $n = (int)($h[1] ?? 1);
+
+    $pools = [
+        'bot' => [
+            'Chrome plating', 'Cargo-bay scuffs', 'Glow strip eyes', 'Bent antenna',
+            'Painted hull marks', 'Tiny tool arms', 'Reactor blush light',
+        ],
+        'android' => [
+            'Soft synth skin', 'Quiet seam lines', 'Work jumpsuit', 'Glass-bright eyes',
+            'Faint cheek ports', 'Dock-hand gloves', 'Calm posture',
+        ],
+        'human' => [
+            'Messy hair', 'Dock jacket', 'Tired eyes', 'Paint on hands',
+            'Knit scarf', 'Freighter boots', 'Ink-stained cuffs',
+        ],
+        'critter' => [
+            'Fluffy coat', 'Big round eyes', 'Tiny tools belt', 'Soft whiskers',
+            'Patchy metal plating', 'Speckled fur', 'Oversize ears', 'Little backpack',
+        ],
+    ];
+    $pool = $pools[$kindKey] ?? $pools['bot'];
+    $out = [];
+    for ($i = 0; $i < count($pool) && count($out) < 3; $i++) {
+        $chip = $pool[($n + ($i * 3)) % count($pool)];
+        if (!in_array($chip, $out, true)) {
+            $out[] = $chip;
+        }
+    }
+    return $out;
+}
+
+/**
+ * Keep look chips short, drop stock fur/tech/size menus, pad with kind-aware invents.
+ *
+ * @param list<mixed> $suggestions
+ * @return list<string>
+ */
+function cardy_sanitize_look_suggestions(array $suggestions, array $concept): array {
+    $stockAsk = '/^(fur|tech|size|coat|eyes|look|details?)$/iu';
+    $kindKey = cardy_kind_bucket($concept);
+    $out = [];
+    foreach ($suggestions as $chip) {
+        if (!is_string($chip)) {
+            continue;
+        }
+        $chip = cardy_shorten_chip($chip, 24);
+        if ($chip === '' || preg_match($stockAsk, $chip)) {
+            continue;
+        }
+        // Soft mismatch filter: humans should not get pure chassis chips by default.
+        if ($kindKey === 'human' && preg_match('/\b(chassis|servo|actuator|unit hull)\b/i', $chip)) {
+            continue;
+        }
+        if ($kindKey === 'bot' && preg_match('/\b(fluffy fur|soft whiskers|wet nose)\b/i', $chip)) {
+            continue;
+        }
+        $dup = false;
+        foreach ($out as $existing) {
+            if (mb_strtolower($existing) === mb_strtolower($chip)) {
+                $dup = true;
+                break;
+            }
+        }
+        if (!$dup) {
+            $out[] = $chip;
+        }
+        if (count($out) >= 3) {
+            return $out;
+        }
+    }
+    foreach (cardy_look_suggestions($concept) as $chip) {
+        $dup = false;
+        foreach ($out as $existing) {
+            if (mb_strtolower($existing) === mb_strtolower($chip)) {
+                $dup = true;
+                break;
+            }
+        }
+        if (!$dup) {
+            $out[] = $chip;
+        }
+        if (count($out) >= 3) {
+            break;
+        }
+    }
+    return $out;
+}
+
+/**
  * Filter AI name chips: drop banned generics, keep unicode callsigns, pad from generator.
  *
  * @param list<mixed> $suggestions
@@ -868,6 +1025,7 @@ function cardy_nickname_suggestions(array $concept): array {
  */
 function cardy_sanitize_name_suggestions(array $suggestions, array $concept): array {
     $banned = '/^(bolt hum|dock rust|map fold|dock pip|cargo bit|cargo pip|night cog|rust wren|warm solder)$/iu';
+    $kindKey = cardy_kind_bucket($concept);
     $out = [];
     foreach ($suggestions as $name) {
         if (!is_string($name)) {
@@ -881,6 +1039,9 @@ function cardy_sanitize_name_suggestions(array $suggestions, array $concept): ar
             continue;
         }
         if (!preg_match('/^[\p{L}\p{N}][\p{L}\p{N}\'\.\- ]{0,15}$/u', $name)) {
+            continue;
+        }
+        if (in_array($kindKey, ['human', 'critter'], true) && cardy_is_robot_serial_name($name)) {
             continue;
         }
         $dup = false;
