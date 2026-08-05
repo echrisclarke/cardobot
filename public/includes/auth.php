@@ -543,16 +543,35 @@ function cardobot_ensure_test_user(): void {
 
 /**
  * Wipe PHP (+ DB if available) Cardy chat state for the always-fresh test account.
+ * Also resets language so a prior Chinese/Spanish preference cannot sticky-lock the pipeline.
  */
 function cardobot_wipe_test_user_chat(int $userId): void {
     $_SESSION['cardobot_sessions'] = [];
-    if ($userId <= 0) {
-        return;
-    }
+    unset($_SESSION['cardobot_locale']);
+
+    require_once __DIR__ . '/i18n.php';
     require_once __DIR__ . '/state.php';
-    if (function_exists('cardy_session_clear_for_user')) {
+
+    if ($userId > 0 && function_exists('cardy_session_clear_for_user')) {
         cardy_session_clear_for_user($userId);
     }
+
+    // Clear saved language preference so Accept-Language / English soft-confirm can run clean.
+    if ($userId > 0) {
+        $pdo = function_exists('get_db_connection') ? get_db_connection() : get_auth_db();
+        if ($pdo) {
+            try {
+                i18n_ensure_schema($pdo);
+                $stmt = $pdo->prepare('UPDATE cardobot_users SET preferred_locale = NULL WHERE id = ?');
+                $stmt->execute([$userId]);
+            } catch (Throwable $e) {
+                error_log('cardobot_wipe_test_user_chat locale: ' . $e->getMessage());
+            }
+        }
+    }
+
+    // Fresh test pipeline always boots in English (browser Chinese must not stick).
+    i18n_set_session_locale('en');
 }
 
 /**

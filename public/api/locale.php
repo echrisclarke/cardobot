@@ -23,7 +23,12 @@ i18n_seed_presets_if_needed();
 if ($method === 'GET') {
     $code = isset($_GET['code']) ? i18n_normalize_code((string)$_GET['code']) : '';
     if ($code === '') {
-        $code = i18n_user_preferred_locale($userId) ?: i18n_session_locale();
+        // Test account must not sticky-load a prior non-English preferred locale.
+        if (function_exists('cardobot_is_test_user') && cardobot_is_test_user((string)($user['username'] ?? ''))) {
+            $code = i18n_session_locale() ?: 'en';
+        } else {
+            $code = i18n_user_preferred_locale($userId) ?: i18n_session_locale();
+        }
     }
     $pack = i18n_fetch_pack($code);
     $presets = [];

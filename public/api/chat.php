@@ -63,7 +63,15 @@ $staticSuggestions = [];
 $autoRender = false;
 
 i18n_seed_presets_if_needed();
-$prefLocale = i18n_user_preferred_locale($userId);
+$isTestUser = cardobot_is_test_user((string)$username);
+$prefLocale = $isTestUser ? null : i18n_user_preferred_locale($userId);
+if ($isTestUser) {
+    // Test account is always a clean English boot, even if the browser is Chinese.
+    i18n_set_session_locale('en');
+    if (empty($session['locale_picked'])) {
+        $session['locale'] = 'en';
+    }
+}
 if (empty($session['locale']) && $prefLocale) {
     $session['locale'] = $prefLocale;
     i18n_set_session_locale($prefLocale);
@@ -136,8 +144,10 @@ $cardy_preferred_greeting = static function (array &$session, string $code) use 
 };
 
 /** First visit / no preferred locale: soft-confirm in one language only. */
-$cardy_soft_confirm_greeting = static function (array &$session, int $userId, ?array $navigatorLanguages) use (&$loc, &$refreshLocalePack): array {
-    $candidate = i18n_predict_locale($userId, $navigatorLanguages);
+$cardy_soft_confirm_greeting = static function (array &$session, int $userId, ?array $navigatorLanguages, ?string $forceLocale = null) use (&$loc, &$refreshLocalePack): array {
+    $candidate = $forceLocale
+        ? (i18n_normalize_code($forceLocale) ?: 'en')
+        : i18n_predict_locale($userId, $navigatorLanguages);
     $nameEn = I18N_PRESET_LOCALES[$candidate]['name_en'] ?? $candidate;
     $nameNative = I18N_PRESET_LOCALES[$candidate]['name_native'] ?? $candidate;
     i18n_ensure_locale($candidate, $nameEn, $nameNative);
@@ -160,11 +170,15 @@ $cardy_soft_confirm_greeting = static function (array &$session, int $userId, ?a
     ];
 };
 
-$cardy_boot_greeting = static function (array &$session, int $userId, ?string $prefLocale, ?array $navigatorLanguages) use ($cardy_preferred_greeting, $cardy_soft_confirm_greeting): array {
+$cardy_boot_greeting = static function (array &$session, int $userId, ?string $prefLocale, ?array $navigatorLanguages) use ($cardy_preferred_greeting, $cardy_soft_confirm_greeting, $isTestUser): array {
+    if ($isTestUser) {
+        // Always start the test pipeline in English; switch via menu / chips afterward.
+        return $cardy_soft_confirm_greeting($session, $userId, null, 'en');
+    }
     if ($prefLocale) {
         return $cardy_preferred_greeting($session, $prefLocale);
     }
-    return $cardy_soft_confirm_greeting($session, $userId, $navigatorLanguages);
+    return $cardy_soft_confirm_greeting($session, $userId, $navigatorLanguages, null);
 };
 
 $pathSuggestions = $pathChipsFor($loc);

@@ -668,7 +668,9 @@ body.chat-page .chat-messages.show-cardy-bg {
             }
         }
     }
-    loadLocalePack();
+    // Boot chrome in English until resume/greeting returns the real locale.
+    // Avoids a sticky Chinese pack flashing in from a prior preferred_locale.
+    loadLocalePack('en');
     preloadGreeting();
 
     function markGreetingReady() {
