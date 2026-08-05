@@ -85,15 +85,17 @@
         textShadow: '0 0 3px rgba(0,0,0,0.95), 0 1px 0 rgba(0,0,0,0.8), 0 -1px 0 rgba(0,0,0,0.55)',
       };
     })(),
-    // type / weight / mass stay inside the art window left/right edges (not the white frame).
+    // type / weight / mass: type left matches BIO; mass stays at art-window right.
     TYPE: (() => {
+      const bioX = sx(72);
       const artW = Math.round(CARD_W * 0.85);
       const artX = Math.round((CARD_W - artW) / 2);
       const pad = 10;
       const inner = artW - pad * 2;
       const col = Math.floor(inner / 3);
+      const heightX = artX + pad + col;
       return {
-        x: artX + pad, y: sy(354), w: col - 4, h: sy(14),
+        x: bioX, y: sy(354), w: Math.max(40, heightX - bioX - 6), h: sy(14),
         fontSize: 12, fontWeight: '500', color: 'rgba(88,88,88,1)',
         align: 'left', maxLines: 1, lineHeight: 1, minFontSize: 9,
         fontFamily: 'sans',
