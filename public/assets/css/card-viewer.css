@@ -42,8 +42,6 @@
 .cob-app-shell .studio-card .studio-power *,
 .cob-app-shell .studio-card .studio-ability,
 .cob-app-shell .studio-card .studio-ability *,
-.cob-app-shell .cob-tool-btn,
-.cob-app-shell .cob-tool-btn *,
 .cob-app-shell .cob-hud,
 .cob-app-shell .cob-hud *,
 .cob-app-shell .cob-popover,
@@ -53,6 +51,12 @@
 .cob-app-shell .cob-back-picker,
 .cob-app-shell .cob-back-picker * {
   font-family: var(--font-family-face-sans, Roboto, "Open Sans", Helvetica, Arial, sans-serif) !important;
+}
+
+/* Tool chrome stays Press Start / console world. */
+.cob-app-shell .cob-tool-btn,
+.cob-app-shell .cob-tool-btn * {
+  font-family: var(--font-family-retro, "Press Start 2P", "Courier New", monospace) !important;
 }
 
 .cob-app-shell.open {
@@ -273,28 +277,69 @@
 }
 
 .cob-tool-btn {
-  width: 2.35rem;
-  height: 2.35rem;
-  border-radius: 0.45rem;
-  border: 1px solid rgba(224, 126, 140, 0.4);
-  background: rgba(224, 126, 140, 0.2);
-  color: #dff6ff;
+  width: 2.55rem;
+  height: 2.55rem;
+  border-radius: 0.35rem;
+  border: 2px solid rgba(77, 77, 77, 0.9);
+  background: rgba(40, 40, 40, 0.95);
+  color: rgb(22, 28, 32);
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 0;
+  padding: 0.15rem;
+  box-shadow: inset 0 -2px 0 rgba(0, 0, 0, 0.35);
+  image-rendering: pixelated;
 }
 
 .cob-tool-btn .ico {
-  font-size: 1rem;
-  line-height: 1;
+  font-size: 0.42rem;
+  line-height: 1.15;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  text-align: center;
+  pointer-events: none;
 }
 
-.cob-tool-btn.active,
+.cob-tool-btn.cob-tone-mint {
+  background: rgb(149, 245, 227);
+  border-color: rgb(40, 120, 110);
+  color: rgb(18, 36, 34);
+}
+
+.cob-tool-btn.cob-tone-beige {
+  background: rgb(255, 229, 192);
+  border-color: rgb(140, 100, 60);
+  color: rgb(40, 28, 18);
+}
+
+.cob-tool-btn.cob-tone-pink {
+  background: rgb(224, 126, 140);
+  border-color: rgb(140, 70, 85);
+  color: rgb(28, 16, 20);
+}
+
+.cob-tool-btn.cob-tone-teal {
+  background: rgb(87, 189, 206);
+  border-color: rgb(36, 100, 120);
+  color: rgb(12, 28, 34);
+}
+
+.cob-tool-btn.active {
+  outline: 2px solid rgb(149, 245, 227);
+  outline-offset: 1px;
+  box-shadow:
+    inset 0 -2px 0 rgba(0, 0, 0, 0.35),
+    0 0 0 1px rgba(149, 245, 227, 0.55);
+}
+
 .cob-tool-btn:hover {
-  border-color: rgba(149, 245, 227, 0.9);
-  background: rgba(149, 245, 227, 0.28);
+  filter: brightness(1.08);
+}
+
+.cob-tool-btn:active {
+  transform: translateY(1px);
+  box-shadow: inset 0 1px 0 rgba(0, 0, 0, 0.35);
 }
 
 .cob-dock {
@@ -315,8 +360,12 @@
 }
 
 .cob-dock .cob-tool-btn {
-  width: 2.6rem;
-  height: 2.6rem;
+  width: 2.75rem;
+  height: 2.75rem;
+}
+
+.cob-dock .cob-tool-btn .ico {
+  font-size: 0.4rem;
 }
 
 .cob-hud {

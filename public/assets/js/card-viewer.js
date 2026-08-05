@@ -274,8 +274,9 @@
       this._closeSheets();
     }
 
-    _iconBtn(id, ico, title) {
-      return `<button type="button" class="cob-tool-btn" data-dock="${id}" title="${title}" aria-label="${title}"><span class="ico">${ico}</span></button>`;
+    _iconBtn(id, glyph, title, tone) {
+      const t = tone || 'teal';
+      return `<button type="button" class="cob-tool-btn cob-tone-${t}" data-dock="${id}" title="${title}" aria-label="${title}"><span class="ico">${glyph}</span></button>`;
     }
 
     _renderChrome() {
@@ -284,34 +285,35 @@
       this.el.classList.toggle('is-viewer-mode', !draw);
       this.el.classList.toggle('is-flipped', this.flipped);
 
+      // Press Start glyphs (short tags) in Card-o-Bot chip colors. No emoji.
       if (draw) {
         this.railLeft.innerHTML = [
-          this._iconBtn('brush', '✎', 'Brush'),
-          this._iconBtn('eraser', '⌫', 'Eraser'),
-          this._iconBtn('hand', '✋', 'Hand'),
-          this._iconBtn('brushes', '◇', 'Tips'),
-          this._iconBtn('inkcolor', '◉', 'Ink color'),
-          this._iconBtn('hud', '◎', 'Size / opacity'),
-          this._iconBtn('undo', '↶', 'Undo'),
-          this._iconBtn('redo', '↷', 'Redo'),
-          this._iconBtn('zoomout', '−', 'Zoom out'),
-          this._iconBtn('zoomin', '+', 'Zoom in'),
-          this._iconBtn('resetzoom', '⤢', 'Fit'),
+          this._iconBtn('brush', 'INK', 'Brush', 'mint'),
+          this._iconBtn('eraser', 'ERS', 'Eraser', 'pink'),
+          this._iconBtn('hand', 'HND', 'Hand', 'beige'),
+          this._iconBtn('brushes', 'TIP', 'Tips', 'teal'),
+          this._iconBtn('inkcolor', 'CLR', 'Ink color', 'pink'),
+          this._iconBtn('hud', 'SZ', 'Size / opacity', 'mint'),
+          this._iconBtn('undo', '<<', 'Undo', 'beige'),
+          this._iconBtn('redo', '>>', 'Redo', 'beige'),
+          this._iconBtn('zoomout', 'Z-', 'Zoom out', 'teal'),
+          this._iconBtn('zoomin', 'Z+', 'Zoom in', 'teal'),
+          this._iconBtn('resetzoom', '1X', 'Fit', 'mint'),
         ].join('');
         this.railRight.innerHTML = [
-          this._iconBtn('layers', '☰', 'Layers'),
-          this._iconBtn('tint', '◐', 'Card tint'),
+          this._iconBtn('layers', 'LYR', 'Layers', 'beige'),
+          this._iconBtn('tint', 'TNT', 'Card tint', 'pink'),
         ].join('');
         this.dock.innerHTML = '';
       } else {
         this.railLeft.innerHTML = '';
         this.railRight.innerHTML = '';
         this.dock.innerHTML = [
-          this._iconBtn('flip', '↻', 'Flip'),
-          this._iconBtn('draw', '✎', 'Draw'),
-          this._iconBtn('tint', '◐', 'Card tint'),
-          this._iconBtn('save', '↓', 'Save'),
-          this._iconBtn('download', '⇪', 'Download'),
+          this._iconBtn('flip', 'FLP', 'Flip', 'mint'),
+          this._iconBtn('draw', 'DRW', 'Draw', 'teal'),
+          this._iconBtn('tint', 'TNT', 'Card tint', 'pink'),
+          this._iconBtn('save', 'SAV', 'Save', 'beige'),
+          this._iconBtn('download', 'GET', 'Download', 'mint'),
         ].join('');
       }
 
