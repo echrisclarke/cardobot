@@ -1,0 +1,151 @@
+{
+  "version": 1,
+  "brushes": [
+    {
+      "id": "hard-round",
+      "name": "Hard Round",
+      "category": "Ink",
+      "tip": "tip-hard-round.png",
+      "spacing": 0.12,
+      "sizePressure": true,
+      "opacityPressure": false,
+      "flow": 1,
+      "hardness": 1,
+      "baseSize": 6
+    },
+    {
+      "id": "ink-fine",
+      "name": "Ink Fine",
+      "category": "Ink",
+      "tip": "tip-hard-round.png",
+      "spacing": 0.08,
+      "sizePressure": true,
+      "opacityPressure": true,
+      "flow": 0.95,
+      "hardness": 1,
+      "baseSize": 3
+    },
+    {
+      "id": "ink-runny",
+      "name": "Runny Inker",
+      "category": "Ink",
+      "tip": "tip-runny.png",
+      "spacing": 0.18,
+      "sizePressure": true,
+      "opacityPressure": true,
+      "flow": 0.85,
+      "hardness": 0.7,
+      "baseSize": 10
+    },
+    {
+      "id": "marker-soft",
+      "name": "Marker Soft",
+      "category": "Marker",
+      "tip": "tip-marker.png",
+      "spacing": 0.1,
+      "sizePressure": true,
+      "opacityPressure": false,
+      "flow": 0.7,
+      "hardness": 0.4,
+      "baseSize": 14
+    },
+    {
+      "id": "marker-hard",
+      "name": "Marker Hard",
+      "category": "Marker",
+      "tip": "tip-hard-round.png",
+      "spacing": 0.1,
+      "sizePressure": true,
+      "opacityPressure": false,
+      "flow": 0.9,
+      "hardness": 0.9,
+      "baseSize": 12
+    },
+    {
+      "id": "charcoal",
+      "name": "Charcoal",
+      "category": "Dry",
+      "tip": "tip-charcoal.png",
+      "spacing": 0.15,
+      "sizePressure": true,
+      "opacityPressure": true,
+      "flow": 0.65,
+      "hardness": 0.3,
+      "baseSize": 18
+    },
+    {
+      "id": "spatter",
+      "name": "Spatter",
+      "category": "Texture",
+      "tip": "tip-spatter.png",
+      "spacing": 0.35,
+      "sizePressure": true,
+      "opacityPressure": true,
+      "flow": 0.8,
+      "hardness": 0.5,
+      "baseSize": 22
+    },
+    {
+      "id": "watercolor",
+      "name": "Watercolor Soft",
+      "category": "Soft",
+      "tip": "tip-watercolor.png",
+      "spacing": 0.08,
+      "sizePressure": true,
+      "opacityPressure": true,
+      "flow": 0.35,
+      "hardness": 0.1,
+      "baseSize": 28
+    },
+    {
+      "id": "hatch",
+      "name": "Hatch",
+      "category": "Texture",
+      "tip": "tip-hatch.png",
+      "spacing": 0.22,
+      "sizePressure": false,
+      "opacityPressure": true,
+      "flow": 0.75,
+      "hardness": 0.6,
+      "baseSize": 16,
+      "rotateToDirection": true
+    },
+    {
+      "id": "rake",
+      "name": "Rake",
+      "category": "Texture",
+      "tip": "tip-rake.png",
+      "spacing": 0.2,
+      "sizePressure": true,
+      "opacityPressure": false,
+      "flow": 0.8,
+      "hardness": 0.5,
+      "baseSize": 20,
+      "rotateToDirection": true
+    },
+    {
+      "id": "halftone",
+      "name": "Halftone Dust",
+      "category": "Texture",
+      "tip": "tip-halftone.png",
+      "spacing": 0.4,
+      "sizePressure": false,
+      "opacityPressure": true,
+      "flow": 0.7,
+      "hardness": 0.5,
+      "baseSize": 24
+    },
+    {
+      "id": "air-soft",
+      "name": "Air Soft",
+      "category": "Soft",
+      "tip": "tip-soft-round.png",
+      "spacing": 0.06,
+      "sizePressure": true,
+      "opacityPressure": true,
+      "flow": 0.25,
+      "hardness": 0.05,
+      "baseSize": 32
+    }
+  ]
+}

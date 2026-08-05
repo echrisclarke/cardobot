@@ -1,4 +1,7 @@
 <?php
+require_once __DIR__ . '/includes/api.php';
+api_boot();
+api_deny_public_probe();
 /**
  * Simple test to check if profile.php can be accessed
  */

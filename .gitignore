@@ -18,3 +18,6 @@ _notes/
 *.swp
 .idea/
 .vscode/
+
+.railway-admin-password.txt
+public/admin/tests/smoke-out/

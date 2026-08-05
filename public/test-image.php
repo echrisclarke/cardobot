@@ -1,4 +1,7 @@
 <?php
+require_once __DIR__ . '/includes/api.php';
+api_boot();
+api_deny_public_probe();
 /**
  * Simple test page for image generation API
  * Visit: https://yourdomain.com/cardobot/test-image.php

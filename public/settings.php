@@ -40,23 +40,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $error = $result['message'];
         }
     }
-    // 'link_google' is handled via the Central Login Authority anchor below; no
-    // POST handler needed any more.
 }
 
-// Central Login Authority handoff URL for the Link-Google button.
-$cardobotHost = $_SERVER['HTTP_HOST'] ?? 'cardobot.com';
-if ($cardobotHost === 'cardobot.com' || $cardobotHost === 'www.cardobot.com') {
-    $linkReturnUrl = 'https://' . $cardobotHost . '/auth/complete.php';
-} else {
-    $linkReturnUrl = 'https://herbiecreative.com/cardobot/auth/complete.php';
-}
-$linkGoogleHref = 'https://herbiecreative.com/auth/google-start.php?'
-    . http_build_query([
-        'app' => 'cardobot',
-        'mode' => 'link',
-        'return' => $linkReturnUrl,
-    ]);
+// Direct Google OAuth on this host (Railway / cardobot.com).
+$linkGoogleHref = $basePath . '/api/google-start.php?mode=link';
 
 $hasGoogleLinked = has_google_linked($userId);
 $hasPassword = !empty($user['password_hash']);

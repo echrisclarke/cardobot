@@ -14,6 +14,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../includes/auth.php';
 require_once __DIR__ . '/../includes/google-auth.php';
+auth_boot(true);
 
 // Resolve the shared library across hosts/addon-domains. DOCUMENT_ROOT differs
 // between cardobot.com (which points at .../public_html/cardobot) and

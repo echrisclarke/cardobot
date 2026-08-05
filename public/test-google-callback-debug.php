@@ -1,4 +1,7 @@
 <?php
+require_once __DIR__ . '/includes/api.php';
+api_boot();
+api_deny_public_probe();
 /**
  * Google OAuth Callback Debug Script
  * This helps identify what's causing the HTTP 500 error

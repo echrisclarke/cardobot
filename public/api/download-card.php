@@ -1,24 +1,39 @@
 <?php
 /**
- * Authenticated download / view of a saved card PNG.
+ * Authenticated download / view of a saved card PNG (or raw art).
  */
 
+require_once __DIR__ . '/../includes/api.php';
 require_once __DIR__ . '/../includes/auth.php';
 require_once __DIR__ . '/../includes/env.php';
 require_once __DIR__ . '/../includes/cards.php';
 
+api_boot(false);
+
 if (!is_logged_in()) {
-    http_response_code(401);
-    header('Content-Type: application/json');
-    echo json_encode(['ok' => false, 'error' => 'Authentication required']);
-    exit;
+    api_error('auth_required', 'Authentication required', 401);
 }
 
 $userId = ensure_user_row();
 $cardId = isset($_GET['card_id']) ? trim((string)$_GET['card_id']) : '';
+$kind = isset($_GET['kind']) ? trim((string)$_GET['kind']) : 'card';
 if (!$userId || $cardId === '') {
     http_response_code(400);
     exit('Missing card');
+}
+
+if ($kind === 'art') {
+    $path = get_upload_root() . '/art/' . (int)$userId . '/' . $cardId . '_art.png';
+    if (!is_file($path)) {
+        http_response_code(404);
+        exit('Art missing');
+    }
+    header('Content-Type: image/png');
+    header('Content-Length: ' . filesize($path));
+    header('Content-Disposition: inline; filename="' . $cardId . '_art.png"');
+    header('Cache-Control: private, max-age=3600');
+    readfile($path);
+    exit;
 }
 
 $card = get_card_for_user((int)$userId, $cardId);
@@ -29,7 +44,6 @@ if (!$card) {
 
 $path = get_upload_root() . '/cards/' . (int)$userId . '/' . $cardId . '.png';
 if (!is_file($path)) {
-    // Fallback: remote URL redirect if stored as absolute http
     $url = $card['image_url'] ?? '';
     if (preg_match('#^https?://#', $url) && !str_contains($url, 'download-card.php')) {
         header('Location: ' . $url);

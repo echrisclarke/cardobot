@@ -1,4 +1,7 @@
 <?php
+require_once __DIR__ . '/includes/api.php';
+api_boot();
+api_deny_public_probe();
 /**
  * Authentication System Test Page
  * Tests login, logout, session management, and Google OAuth configuration

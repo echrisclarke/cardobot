@@ -25,7 +25,10 @@
   width: min(303px, 86vw);
   aspect-ratio: 303 / 400;
   overflow: hidden;
+  border-radius: 1.4rem;
   box-shadow: 0 8px 28px rgba(0, 0, 0, 0.35);
+  container-type: inline-size;
+  container-name: studio-card;
 }
 
 .studio-card-color,
@@ -84,47 +87,12 @@
   z-index: 5;
   pointer-events: none;
   color: #1a1a1a;
-  font-family: Georgia, 'Times New Roman', serif;
-  padding: 8% 9% 6%;
-}
-
-.studio-nickname {
-  font-weight: 700;
-  font-size: clamp(0.85rem, 3.2vw, 1.05rem);
-  line-height: 1.2;
-}
-
-.studio-bio {
-  position: absolute;
-  left: 9%;
-  right: 9%;
-  top: 76%;
-  font-size: clamp(0.55rem, 2.2vw, 0.7rem);
-  line-height: 1.25;
-  max-height: 12%;
-  overflow: hidden;
-}
-
-.studio-power {
-  position: absolute;
-  left: 9%;
-  bottom: 10%;
-  font-weight: 700;
-  font-size: clamp(0.6rem, 2.4vw, 0.75rem);
-}
-
-.studio-ability {
-  position: absolute;
-  left: 9%;
-  bottom: 5%;
-  font-size: clamp(0.55rem, 2.2vw, 0.68rem);
+  font-family: "Roboto", "Open Sans", "Segoe UI", sans-serif;
+  padding: 0;
 }
 
 .studio-tools {
-  width: min(420px, 94vw);
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
+  display: none !important;
 }
 
 .studio-tool-row {
@@ -224,4 +192,28 @@
   width: 100%;
   box-sizing: border-box;
   margin-top: 0.2rem;
+}
+
+.confirm-nick-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  align-items: center;
+  margin: 0.15rem 0 0.45rem;
+}
+
+.confirm-nick-chips .confirm-nick-chip {
+  font-size: 0.78rem;
+  padding: 0.28rem 0.65rem;
+}
+
+.confirm-nick-chips .confirm-nick-chip.is-selected {
+  outline: 1px solid rgba(149, 245, 227, 0.7);
+  background: rgba(149, 245, 227, 0.12);
+}
+
+.confirm-nick-hint {
+  font-size: 0.72rem;
+  opacity: 0.75;
+  width: 100%;
 }

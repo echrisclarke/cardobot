@@ -16,10 +16,14 @@
  */
 function cardobot_asset_url(string $pathFromCardobotRoot): string {
     $assetPath = get_asset_path();
-    $url       = $assetPath . '/' . ltrim($pathFromCardobotRoot, '/');
-    $disk      = ($_SERVER['DOCUMENT_ROOT'] ?? '') . $url;
+    $rel       = ltrim($pathFromCardobotRoot, '/');
+    $url       = rtrim($assetPath, '/') . '/' . $rel;
+    // Resolve from public/ (this file lives in public/includes/)
+    $disk = dirname(__DIR__) . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $rel);
     if (is_file($disk)) {
         $url .= '?v=' . filemtime($disk);
+    } else {
+        $url .= '?v=' . time();
     }
     return htmlspecialchars($url, ENT_QUOTES, 'UTF-8');
 }

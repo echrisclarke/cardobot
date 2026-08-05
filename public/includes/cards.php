@@ -147,7 +147,13 @@ function save_finished_card(int $userId, string $sessionId, array $opts): array 
     }
 
     $power = mb_substr(trim((string)($visualConcept['power_name'] ?? '')), 0, 255);
-    $ability = trim((string)($visualConcept['ability_line'] ?? ''));
+    $abilityName = trim((string)($visualConcept['ability_name'] ?? ''));
+    $abilityLine = trim((string)($visualConcept['ability_line'] ?? ''));
+    if ($abilityName !== '' && $abilityLine !== '') {
+        $ability = trim($abilityName . ' ' . $abilityLine);
+    } else {
+        $ability = $abilityName !== '' ? $abilityName : $abilityLine;
+    }
     $drawing = $opts['drawing_data'] ?? null;
     if (is_array($drawing)) {
         $drawing = json_encode($drawing);
@@ -161,14 +167,34 @@ function save_finished_card(int $userId, string $sessionId, array $opts): array 
     if (!empty($opts['art_url'])) {
         $attrs['art_url'] = $opts['art_url'];
     }
+    if (!empty($opts['back_variant'])) {
+        $attrs['back_variant'] = $opts['back_variant'];
+    }
+    if (isset($opts['back_hue'])) {
+        $attrs['back_hue'] = (int)$opts['back_hue'];
+        $attrs['back_saturation'] = (int)($opts['back_saturation'] ?? 65);
+        $attrs['back_lightness'] = (int)($opts['back_lightness'] ?? 40);
+    }
+
+    $stats = is_array($opts['stats'] ?? null) ? $opts['stats'] : [];
+    $hp = isset($stats['hp']) ? (int)$stats['hp'] : (isset($opts['hp']) ? (int)$opts['hp'] : null);
+    $npo = isset($stats['npo']) ? (int)$stats['npo'] : (isset($opts['npo']) ? (int)$opts['npo'] : null);
+    $att = isset($stats['att']) ? (int)$stats['att'] : (isset($opts['att']) ? (int)$opts['att'] : null);
+    $str = isset($stats['str']) ? (int)$stats['str'] : (isset($opts['str']) ? (int)$opts['str'] : null);
+    $los = isset($stats['los']) ? (int)$stats['los'] : (isset($opts['los']) ? (int)$opts['los'] : null);
+    $con = isset($stats['con']) ? (int)$stats['con'] : (isset($opts['con']) ? (int)$opts['con'] : null);
+    if (!empty($stats)) {
+        $attrs['stats'] = $stats;
+    }
 
     try {
         $stmt = $pdo->prepare("
             INSERT INTO cardobot_cards
                 (card_id, user_id, type, image_url, drawing_data, nickname, bio, power, ability,
+                 hp, att, str, los, con, npo,
                  hue, saturation, lightness, attributes_json, created_at)
             VALUES
-                (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
+                (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
             ON DUPLICATE KEY UPDATE
                 type = VALUES(type),
                 image_url = VALUES(image_url),
@@ -177,6 +203,12 @@ function save_finished_card(int $userId, string $sessionId, array $opts): array 
                 bio = VALUES(bio),
                 power = VALUES(power),
                 ability = VALUES(ability),
+                hp = VALUES(hp),
+                att = VALUES(att),
+                str = VALUES(str),
+                los = VALUES(los),
+                con = VALUES(con),
+                npo = VALUES(npo),
                 hue = VALUES(hue),
                 saturation = VALUES(saturation),
                 lightness = VALUES(lightness),
@@ -193,6 +225,12 @@ function save_finished_card(int $userId, string $sessionId, array $opts): array 
             $bio,
             $power !== '' ? $power : null,
             $ability !== '' ? $ability : null,
+            $hp,
+            $att,
+            $str,
+            $los,
+            $con,
+            $npo,
             $hue,
             $sat,
             $light,

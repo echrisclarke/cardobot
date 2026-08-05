@@ -1,68 +1,61 @@
 <?php
 /**
- * Save the rendered image from a card session into the user's collection.
- *
- * POST JSON: { "session_id": "cs_..." }
- *
- * Idempotent: re-saving the same session updates the existing row instead of
- * inserting a duplicate. Returns the saved card_id (= session_id).
+ * Legacy save path: requires a local framed asset (use export-card for product saves).
  */
 
+require_once __DIR__ . '/../includes/api.php';
 require_once __DIR__ . '/../includes/auth.php';
 require_once __DIR__ . '/../includes/cards.php';
 require_once __DIR__ . '/../includes/state.php';
 
-header('Content-Type: application/json; charset=utf-8');
-
-if (!is_logged_in()) {
-    http_response_code(401);
-    echo json_encode(['ok' => false, 'error' => 'Authentication required']);
-    exit;
-}
+api_boot(false);
+api_assert_same_origin();
+api_require_login();
 
 $userId = ensure_user_row();
 if (!$userId) {
-    http_response_code(500);
-    echo json_encode(['ok' => false, 'error' => 'Could not load your account']);
-    exit;
+    api_error('account_error', 'Could not load your account', 500);
 }
 
-$raw = file_get_contents('php://input');
-$data = json_decode($raw, true);
-if (!is_array($data)) {
-    $data = [];
-}
-
+$data = api_require_post_json();
 $sessionId = isset($data['session_id']) && is_string($data['session_id']) ? trim($data['session_id']) : '';
 if ($sessionId === '') {
-    http_response_code(400);
-    echo json_encode(['ok' => false, 'error' => 'session_id is required']);
-    exit;
+    api_error('missing_session', 'session_id is required', 400);
 }
 
-$session = cardy_session_get($sessionId);
-$imageUrl = $session['image_url'] ?? '';
-if ($imageUrl === '') {
-    http_response_code(400);
-    echo json_encode(['ok' => false, 'error' => 'No image to save -- render one first.']);
-    exit;
+$session = cardy_session_find($sessionId);
+if ($session === null) {
+    api_error('unknown_session', 'Unknown session_id', 404);
 }
 
-$result = save_image_card(
-    $userId,
-    $sessionId,
-    $imageUrl,
-    $session['visual_concept'] ?? []
-);
+$framedPath = get_upload_root() . '/cards/' . (int)$userId . '/' . $sessionId . '.png';
+if (!is_file($framedPath)) {
+    api_error(
+        'export_required',
+        'Finish and export the framed card first (use export-card). Raw paint URLs are not saved.',
+        400
+    );
+}
+
+$basePath = get_base_path();
+$imageUrl = $basePath . '/api/download-card.php?card_id=' . rawurlencode($sessionId);
+
+$result = save_finished_card($userId, $sessionId, [
+    'image_url' => $imageUrl,
+    'visual_concept' => $session['visual_concept'] ?? [],
+    'art_url' => $session['art_url'] ?? $session['image_url'] ?? null,
+    'stats' => $session['stats'] ?? null,
+    'hue' => $session['hue'] ?? null,
+    'saturation' => $session['saturation'] ?? null,
+    'lightness' => $session['lightness'] ?? null,
+]);
 
 if (!$result['success']) {
-    http_response_code(500);
-    echo json_encode(['ok' => false, 'error' => $result['message']]);
-    exit;
+    api_error('save_failed', $result['message'] ?? 'Save failed', 500);
 }
 
-echo json_encode([
-    'ok'      => true,
+api_json([
+    'ok' => true,
     'card_id' => $result['card_id'],
     'message' => 'Saved to your collection.',
 ]);

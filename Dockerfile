@@ -4,17 +4,15 @@ FROM php:8.2-apache
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         libpng-dev libjpeg62-turbo-dev libfreetype6-dev libzip-dev zlib1g-dev \
+        libonig-dev \
     && docker-php-ext-configure gd --with-freetype --with-jpeg \
     && docker-php-ext-install -j$(nproc) gd mbstring pdo pdo_mysql mysqli opcache \
-    && a2enmod rewrite headers \
+    && rm -f /etc/apache2/mods-enabled/mpm_*.load /etc/apache2/mods-enabled/mpm_*.conf \
+    && a2enmod mpm_prefork rewrite headers \
     && rm -rf /var/lib/apt/lists/*
 
-ENV APACHE_DOCUMENT_ROOT=/var/www/html/public
-RUN sed -ri -e 's!/var/www/html!${APACHE_DOCUMENT_ROOT}!g' /etc/apache2/sites-available/*.conf \
-    && sed -ri -e 's!/var/www/!${APACHE_DOCUMENT_ROOT}!g' /etc/apache2/apache2.conf /etc/apache2/conf-available/*.conf
-
-COPY docker/apache-ports.conf /etc/apache2/ports.conf
-COPY docker/apache-vhost.conf /etc/apache2/sites-available/000-default.conf
+COPY docker/apache-ports.conf /etc/apache2/ports.conf.template
+COPY docker/apache-vhost.conf /etc/apache2/sites-available/000-default.conf.template
 COPY docker/entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 

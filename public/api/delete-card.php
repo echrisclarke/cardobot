@@ -1,25 +1,19 @@
 <?php
+require_once __DIR__ . '/../includes/api.php';
 require_once __DIR__ . '/../includes/auth.php';
 require_once __DIR__ . '/../includes/cards.php';
 require_once __DIR__ . '/../includes/env.php';
 
-header('Content-Type: application/json; charset=utf-8');
-
-if (!is_logged_in()) {
-    http_response_code(401);
-    echo json_encode(['ok' => false, 'error' => 'Authentication required']);
-    exit;
-}
+api_boot(false);
+api_assert_same_origin();
+api_require_login();
 
 $userId = ensure_user_row();
-$raw = file_get_contents('php://input');
-$data = json_decode($raw, true) ?: [];
+$data = api_require_post_json();
 $cardId = isset($data['card_id']) ? trim((string)$data['card_id']) : '';
 
 if (!$userId || $cardId === '') {
-    http_response_code(400);
-    echo json_encode(['ok' => false, 'error' => 'card_id required']);
-    exit;
+    api_error('missing_card', 'card_id required', 400);
 }
 
 $ok = delete_user_card((int)$userId, $cardId);
@@ -28,6 +22,14 @@ if ($ok) {
     if (is_file($path)) {
         @unlink($path);
     }
+    $art = get_upload_root() . '/art/' . (int)$userId . '/' . $cardId . '_art.png';
+    if (is_file($art)) {
+        @unlink($art);
+    }
 }
 
-echo json_encode(['ok' => $ok]);
+api_json([
+    'ok' => $ok,
+    'error' => $ok ? null : 'delete_failed',
+    'message' => $ok ? 'Deleted' : 'Could not delete card',
+], $ok ? 200 : 404);

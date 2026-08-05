@@ -1,4 +1,7 @@
 <?php
+require_once __DIR__ . '/includes/api.php';
+api_boot();
+api_deny_public_probe();
 /**
  * .env File Diagnostic and Fix Script
  * Run this to check and fix common .env file issues

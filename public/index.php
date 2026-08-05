@@ -4,7 +4,7 @@
  *
  * Intro flow (preserved from v2):
  *   1) Story text + Continue
- *   2) System notice + loading bar (Cardy's greeting loads in the background)
+ *   2) Loading bar (Cardy's greeting loads in the background)
  *   3) "A face appears..." -> Cardy GIF fades in -> Cardy types out her hello
  *   4) From there a structured 3-question wizard runs
  * Chat v2: gather -> confirm -> ready -> render -> reveal
@@ -21,13 +21,17 @@ require_auth();
 
 $basePath = get_base_path();
 $assetPath = get_asset_path();
+$cardobotUsername = (string)(get_username() ?: 'Cardy');
 
 console_start('Card-o-Bot');
 $contentClosed = console_content_end();
 ?>
-<link rel="stylesheet" href="<?php echo htmlspecialchars($assetPath); ?>/assets/css/studio.css">
-<script src="<?php echo htmlspecialchars($assetPath); ?>/assets/js/drawing-engine.js"></script>
-<script src="<?php echo htmlspecialchars($assetPath); ?>/assets/js/card-studio.js"></script>
+<link rel="stylesheet" href="<?php echo cardobot_asset_url('assets/css/studio.css'); ?>">
+<link rel="stylesheet" href="<?php echo cardobot_asset_url('assets/css/card-viewer.css'); ?>">
+<script src="<?php echo cardobot_asset_url('assets/js/card-layout.js'); ?>"></script>
+<script src="<?php echo cardobot_asset_url('assets/js/drawing-engine.js'); ?>"></script>
+<script src="<?php echo cardobot_asset_url('assets/js/card-studio.js'); ?>"></script>
+<script src="<?php echo cardobot_asset_url('assets/js/card-viewer.js'); ?>"></script>
 <style>
 /* ------------------------------------------------------------------
    Wizard-specific additions on top of base.css. The intro text,
@@ -155,10 +159,19 @@ body.chat-page .chat-messages.show-cardy-bg {
     align-items: center;
     justify-content: center;
     gap: 0.75rem;
+    min-height: 240px;
     padding: 2.5rem 1rem;
     color: var(--color-secondary-light);
     font-family: var(--font-family-retro, var(--font-family-primary));
     text-align: center;
+    background: rgba(0, 0, 0, 0.55);
+    border: 1px dashed rgba(var(--color-secondary-rgb), 0.45);
+    border-radius: var(--radius-sm);
+}
+.wizard-card-image .wizard-image-loading p {
+    margin: 0;
+    font-size: 0.95rem;
+    line-height: 1.4;
 }
 @keyframes cardImageReveal {
     from { opacity: 0; transform: translateY(8px); }
@@ -212,7 +225,7 @@ body.chat-page .chat-messages.show-cardy-bg {
         <p class="loading-text">Initializing connection...</p>
     </div>
 
-    <!-- Subsequent stages (notice, face appearing, Cardy messages, suggestion chips) appended dynamically. -->
+    <!-- Subsequent stages (face appearing, Cardy messages, suggestion chips) appended dynamically. -->
 </div>
 
 <div class="wizard-render-button-container hidden" id="renderButtonContainer">
@@ -220,13 +233,17 @@ body.chat-page .chat-messages.show-cardy-bg {
 </div>
 
 <div class="confirm-panel" id="confirmPanel">
-    <p><strong>Confirm concept</strong></p>
-    <label>Nickname <input type="text" id="confirmNickname" maxlength="100"></label>
+    <p><strong>Your card so far</strong></p>
+    <p class="confirm-hint" style="font-size:0.8rem;opacity:0.85;margin:0 0 0.5rem;">Tweak anything, then paint.</p>
+    <label>Nickname
+      <input type="text" id="confirmNickname" maxlength="22" placeholder="Type your own callsign">
+    </label>
+    <div class="confirm-nick-chips" id="confirmNickChips" aria-label="Suggested names from Cardy"></div>
     <label>Vibe <input type="text" id="confirmVibe" maxlength="120"></label>
     <label>Details <textarea id="confirmDetails" rows="2" maxlength="500"></textarea></label>
     <div class="reveal-actions">
         <button type="button" id="confirmPaintBtn">Paint it!</button>
-        <button type="button" class="secondary" id="confirmUpdateBtn">Update concept</button>
+        <button type="button" class="secondary" id="confirmUpdateBtn">Update</button>
     </div>
 </div>
 
@@ -277,9 +294,18 @@ body.chat-page .chat-messages.show-cardy-bg {
     const $studioRoot      = document.getElementById('studioRoot');
 
     const assetBase = <?php echo json_encode($assetPath); ?>;
+    const cardobotUsername = <?php echo json_encode($cardobotUsername); ?>;
     let studio = null;
     let lastArtUrl = null;
     let lastConcept = {};
+    let lastStats = null;
+    let cardViewer = null;
+
+    function conceptWithCredit(concept) {
+        const c = Object.assign({}, concept || {});
+        if (!c.creator_username && !c.username) c.creator_username = cardobotUsername;
+        return c;
+    }
 
     // ============================================================
     //   State
@@ -288,6 +314,10 @@ body.chat-page .chat-messages.show-cardy-bg {
         sessionId: null,
         step: 'greeting',
         mode: null,
+        path: null,
+        pendingRender: false,
+        pendingRenderStatus: '',
+        renderInFlight: false,
         readyToRender: false,
         savedCardId: null,
         visualConcept: null,
@@ -315,16 +345,31 @@ body.chat-page .chat-messages.show-cardy-bg {
     // ============================================================
     //   HTTP helper
     // ============================================================
-    async function postJson(url, body) {
-        const res = await fetch(url, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(body || {}),
-        });
+    async function postJson(url, body, attempt) {
+        attempt = attempt || 0;
+        let res;
+        try {
+            res = await fetch(url, {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body || {}),
+            });
+        } catch (netErr) {
+            if (attempt < 1) return postJson(url, body, attempt + 1);
+            throw new Error(netErr.message || 'Network error');
+        }
         let data = null;
         try { data = await res.json(); } catch (e) {}
         if (!res.ok) {
-            const msg = (data && (data.error || data.message)) || ('HTTP ' + res.status);
+            if (res.status === 401) {
+                window.location.href = basePath + '/login.php?redirect=' + encodeURIComponent(window.location.pathname + window.location.search);
+                throw new Error('Authentication required. Please sign in again.');
+            }
+            if ((res.status >= 500 || res.status === 502) && attempt < 1) {
+                return postJson(url, body, attempt + 1);
+            }
+            const msg = (data && (data.message || data.error)) || ('HTTP ' + res.status);
             throw new Error(msg);
         }
         return data;
@@ -335,23 +380,30 @@ body.chat-page .chat-messages.show-cardy-bg {
     // ============================================================
     async function preloadGreeting() {
         try {
-            const data = await postJson(basePath + '/api/chat.php', {});
-            state.sessionId = data.session_id || null;
+            const data = await postJson(basePath + '/api/chat.php', { action: 'greeting' });
+            if (!data.session_id) throw new Error('No session from Cardy');
+            state.sessionId = data.session_id;
             state.greeting = data;
             state.greetingReady = true;
             markGreetingReady();
         } catch (err) {
             console.error('greeting preload failed:', err);
             state.greetingError = err.message || 'unknown error';
-            state.greeting = {
-                message: "Hi there! I'm Cardy! *beep boop* The connection's a little spotty, but ready to chat?",
-                suggestions: ["Yes, let's make one!", "Tell me more first"],
-                session_id: null,
-                step: 'greeting',
-                mode: null,
-            };
-            state.greetingReady = true;
-            markGreetingReady();
+            state.greeting = null;
+            state.greetingReady = false;
+            if (/Authentication required/i.test(state.greetingError)) {
+                return; // postJson already sent us to login
+            }
+            if ($chatLoadingBar) {
+                const t = $chatLoadingBar.querySelector('.loading-text');
+                if (t) t.textContent = 'Connection glitch. Tap Continue to retry.';
+            }
+            const noticeBtn = document.querySelector('#noticeContinueBtn .continue-button');
+            if (noticeBtn) {
+                noticeBtn.disabled = false;
+                noticeBtn.style.opacity = '1';
+                noticeBtn.onclick = () => { state.greetingReady = false; preloadGreeting(); };
+            }
         }
     }
     preloadGreeting();
@@ -379,14 +431,7 @@ body.chat-page .chat-messages.show-cardy-bg {
         if ($introContinue) $introContinue.classList.add('hidden');
         $chatLoadingBar.classList.remove('hidden');
 
-        // Append system notice.
-        const notice = document.createElement('div');
-        notice.className = 'system-notification';
-        notice.id = 'systemNotice';
-        notice.innerHTML = '<strong>&#9888;&#65039; Notice:</strong> The Card-o-Bot device appears to be in a transitional state. Some systems may not function as intended. Feel free to interact with Cardy and see what happens.';
-        $chatMessages.appendChild(notice);
-
-        // Append a "Continue" button below the notice (disabled until greeting ready).
+        // Continue once Cardy's greeting is ready (no system notice).
         const noticeBtnContainer = document.createElement('div');
         noticeBtnContainer.className = 'continue-button-container';
         noticeBtnContainer.id = 'noticeContinueBtn';
@@ -410,12 +455,11 @@ body.chat-page .chat-messages.show-cardy-bg {
         $chatMessages.appendChild(noticeBtnContainer);
         $chatMessages.scrollTop = $chatMessages.scrollHeight;
 
-        // If greeting is already ready, immediately mark the button enabled.
         if (state.greetingReady) markGreetingReady();
     }
 
     // ============================================================
-    //   Stage 3: user clicks Continue on the notice
+    //   Stage 3: Continue after init
     //   -> face appears -> face fades out -> Cardy speaks
     // ============================================================
     function proceedFromNotice() {
@@ -423,8 +467,6 @@ body.chat-page .chat-messages.show-cardy-bg {
         if (noticeBtn) noticeBtn.classList.add('hidden');
         if ($chatLoadingBar) $chatLoadingBar.classList.add('hidden');
         if ($introMessage)   $introMessage.classList.add('hidden');
-        const sysNotice = document.getElementById('systemNotice');
-        if (sysNotice) sysNotice.classList.add('hidden');
 
         const faceMsg = document.createElement('div');
         faceMsg.className = 'intro-message face-appearing-message';
@@ -527,19 +569,24 @@ body.chat-page .chat-messages.show-cardy-bg {
                 wrap.appendChild(btn);
             });
 
-            // "Type your own response" hint that focuses the input.
-            const own = document.createElement('button');
-            own.type = 'button';
-            own.className = 'suggestion-button type-own-button';
-            own.textContent = 'Type your own response';
-            own.addEventListener('click', () => {
-                $messageInput.focus();
-                $messageInput.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-            });
-            wrap.appendChild(own);
+            // Only offer "type your own" when there are chips to contrast against.
+            // Empty suggestion turns = just use the text box.
+            if (suggestions.length > 0 && !['confirm', 'ready', 'reveal', 'rendering'].includes(state.step)) {
+                const own = document.createElement('button');
+                own.type = 'button';
+                own.className = 'suggestion-button type-own-button';
+                own.textContent = 'Type your own response';
+                own.addEventListener('click', () => {
+                    $messageInput.focus();
+                    $messageInput.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                });
+                wrap.appendChild(own);
+            }
 
-            $chatMessages.appendChild(wrap);
-            $chatMessages.scrollTop = $chatMessages.scrollHeight;
+            if (wrap.childElementCount > 0) {
+                $chatMessages.appendChild(wrap);
+                $chatMessages.scrollTop = $chatMessages.scrollHeight;
+            }
         }, delay);
     }
 
@@ -587,19 +634,34 @@ body.chat-page .chat-messages.show-cardy-bg {
     function showRenderButton() { $renderContainer.classList.remove('hidden'); }
     function hideRenderButton() { $renderContainer.classList.add('hidden'); }
 
-    // Append the painting-in-progress placeholder INLINE inside the chat scroll.
-    function showImageLoading() {
-        removeImageLoading();
+    // Append the printers-running placeholder INLINE inside the chat scroll.
+    // statusText comes from Cardy (AI) when available.
+    function showImageLoading(statusText) {
+        const line = (statusText && String(statusText).trim())
+            ? String(statusText).trim()
+            : 'Printers warming up... *whirr*';
+        if (state.imageLoadingElement && state.imageLoadingElement.parentNode) {
+            const p = state.imageLoadingElement.querySelector('p');
+            if (p) p.textContent = line;
+            return;
+        }
         const block = document.createElement('div');
         block.className = 'wizard-card-image';
-        block.innerHTML = `
-            <div class="wizard-image-loading">
-                <div class="wizard-spinner"></div>
-                <p>Painting your character... *whirr*</p>
-            </div>`;
+        block.setAttribute('data-loading', '1');
+        const wrap = document.createElement('div');
+        wrap.className = 'wizard-image-loading';
+        wrap.setAttribute('role', 'status');
+        wrap.setAttribute('aria-live', 'polite');
+        wrap.innerHTML = '<div class="wizard-spinner" aria-hidden="true"></div>';
+        const p = document.createElement('p');
+        p.textContent = line;
+        wrap.appendChild(p);
+        block.appendChild(wrap);
         $chatMessages.appendChild(block);
-        $chatMessages.scrollTop = $chatMessages.scrollHeight;
         state.imageLoadingElement = block;
+        requestAnimationFrame(() => {
+            $chatMessages.scrollTop = $chatMessages.scrollHeight;
+        });
     }
     function removeImageLoading() {
         if (state.imageLoadingElement && state.imageLoadingElement.parentNode) {
@@ -621,7 +683,7 @@ body.chat-page .chat-messages.show-cardy-bg {
         const block = document.createElement('div');
         block.className = 'wizard-card-image';
         const img = document.createElement('img');
-        img.alt = 'Your character';
+        img.alt = 'Your card';
         img.src = url;
         block.appendChild(img);
         $chatMessages.appendChild(block);
@@ -629,8 +691,45 @@ body.chat-page .chat-messages.show-cardy-bg {
         state.imageElement = block;
     }
 
+    function ensureViewer() {
+        if (cardViewer) return cardViewer;
+        cardViewer = new window.CardobotViewer({
+            assetBase: assetBase,
+            apiBase: basePath,
+            onClose: () => {},
+            onCreditChange: (on) => {
+                lastConcept = Object.assign({}, lastConcept || {}, { show_credit: !!on });
+                if (state.visualConcept) {
+                    state.visualConcept = Object.assign({}, state.visualConcept, { show_credit: !!on });
+                }
+            },
+            onSave: async ({ download, studio: s, sessionId, viewer }) => {
+                await handleSaveFramed(!!download, s, viewer);
+            },
+        });
+        return cardViewer;
+    }
+
+    async function openCardApp(mode) {
+        if (!lastArtUrl) return;
+        $studioPanel.classList.remove('visible');
+        const v = ensureViewer();
+        await v.open({
+            sessionId: state.sessionId,
+            concept: conceptWithCredit(lastConcept || state.visualConcept || {}),
+            stats: lastStats || {},
+            artUrl: lastArtUrl,
+            mode: mode === 'draw' ? 'draw' : 'viewer',
+        });
+    }
+
     function appendRevealActionsAfter(messageEl) {
         clearStaleSuggestions();
+        removeImageLoading();
+        if (state.imageElement && state.imageElement.parentNode) {
+            state.imageElement.parentNode.removeChild(state.imageElement);
+            state.imageElement = null;
+        }
         const wrap = document.createElement('div');
         wrap.className = 'suggested-responses reveal-actions';
 
@@ -639,32 +738,70 @@ body.chat-page .chat-messages.show-cardy-bg {
             b.type = 'button';
             b.className = 'suggestion-button';
             b.textContent = label;
+            b.setAttribute('data-action', label.toLowerCase().replace(/\s+/g, '-'));
             b.addEventListener('click', fn);
             wrap.appendChild(b);
         }
 
-        chip('Save card', () => handleSaveFramed(false));
-        chip('Draw on it', () => openStudio(true));
-        chip('Download PNG', () => handleSaveFramed(true));
+        chip('View card', () => openCardApp('viewer'));
+        chip('Draw on it', () => openCardApp('draw'));
         chip('Change something', () => promptRevise());
         chip('Make another one', handleMakeAnother);
 
         $chatMessages.appendChild(wrap);
         $chatMessages.scrollTop = $chatMessages.scrollHeight;
-        // Also show framed preview in studio (drawing off until Draw)
-        openStudio(false);
+        // Auto-open the holo viewer
+        openCardApp('viewer');
     }
 
-    function fillConfirmPanel(concept) {
+    function fillConfirmPanel(concept, nickSuggestions) {
         lastConcept = concept || {};
         document.getElementById('confirmNickname').value = lastConcept.nickname || lastConcept.subject || '';
         document.getElementById('confirmVibe').value = lastConcept.vibe || '';
         document.getElementById('confirmDetails').value = lastConcept.details || '';
+        renderConfirmNickChips(nickSuggestions);
         $confirmPanel.classList.add('visible');
+    }
+
+    function renderConfirmNickChips(suggestions) {
+        const wrap = document.getElementById('confirmNickChips');
+        if (!wrap) return;
+        wrap.innerHTML = '';
+        const list = Array.isArray(suggestions) ? suggestions : [];
+        const current = (document.getElementById('confirmNickname').value || '').trim();
+        const seen = new Set();
+        list.forEach((name) => {
+            if (!name || typeof name !== 'string') return;
+            const label = name.trim().slice(0, 22);
+            if (!label) return;
+            const key = label.toLowerCase();
+            if (seen.has(key)) return;
+            seen.add(key);
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'suggestion-button confirm-nick-chip'
+                + (label.toLowerCase() === current.toLowerCase() ? ' is-selected' : '');
+            btn.textContent = label;
+            btn.addEventListener('click', () => {
+                document.getElementById('confirmNickname').value = label;
+                wrap.querySelectorAll('.confirm-nick-chip').forEach((el) => {
+                    el.classList.toggle('is-selected', el.textContent === label);
+                });
+            });
+            wrap.appendChild(btn);
+        });
+        if (wrap.childElementCount > 0) {
+            const hint = document.createElement('span');
+            hint.className = 'confirm-nick-hint';
+            hint.textContent = 'Or type your own name above.';
+            wrap.appendChild(hint);
+        }
     }
 
     function hideConfirmPanel() {
         $confirmPanel.classList.remove('visible');
+        const wrap = document.getElementById('confirmNickChips');
+        if (wrap) wrap.innerHTML = '';
     }
 
     async function ensureStudio() {
@@ -674,20 +811,13 @@ body.chat-page .chat-messages.show-cardy-bg {
             assetBase: assetBase,
             frameUrl: assetBase + '/assets/img/01_Card.png',
             bgUrl: assetBase + '/assets/img/01_CardBGtexture.png',
+            hideTools: true,
         });
         return studio;
     }
 
     async function openStudio(enableDrawing) {
-        $studioPanel.classList.add('visible');
-        const s = await ensureStudio();
-        s.setConcept(lastConcept || state.visualConcept || {});
-        if (lastArtUrl) await s.setArt(lastArtUrl);
-        s.setDrawingEnabled(!!enableDrawing);
-        if (enableDrawing) {
-            state.step = 'studio';
-        }
-        $studioPanel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        await openCardApp(enableDrawing ? 'draw' : 'viewer');
     }
 
     function promptRevise() {
@@ -697,14 +827,27 @@ body.chat-page .chat-messages.show-cardy-bg {
         sendChat({ action: 'revise', user_message: note });
     }
 
-    async function handleSaveFramed(downloadOnly) {
+    async function handleSaveFramed(downloadOnly, studioOverride, viewer) {
         try {
             setBusy(true);
-            const s = await ensureStudio();
-            s.setConcept(lastConcept || state.visualConcept || {});
-            if (lastArtUrl) await s.setArt(lastArtUrl);
-            const png = await s.compositeDataUrl(2);
+            const s = studioOverride || await ensureStudio();
+            const concept = conceptWithCredit(lastConcept || state.visualConcept || {});
+            if (viewer && viewer.studio) {
+                concept.show_credit = viewer.studio.getShowCredit();
+            } else if (!Object.prototype.hasOwnProperty.call(concept, 'show_credit')) {
+                concept.show_credit = true;
+            }
+            s.setConcept(concept, lastStats || {});
+            if (lastArtUrl && !studioOverride) await s.setArt(lastArtUrl);
+            let png;
+            try {
+                png = await s.compositeDataUrl(2);
+            } catch (corsErr) {
+                console.warn('composite CORS, retry without crossOrigin art', corsErr);
+                png = await s.compositeDataUrl(2);
+            }
             const hsl = s.getHsl();
+            const extras = viewer && viewer.getExtras ? viewer.getExtras() : {};
             if (downloadOnly) {
                 const a = document.createElement('a');
                 a.href = png;
@@ -713,14 +856,15 @@ body.chat-page .chat-messages.show-cardy-bg {
                 setBusy(false);
                 return;
             }
-            const data = await postJson(basePath + '/api/export-card.php', {
+            const data = await postJson(basePath + '/api/export-card.php', Object.assign({
                 session_id: state.sessionId,
                 composite_png: png,
                 drawing_data: s.getDrawingData(),
                 hue: hsl.hue,
                 saturation: hsl.saturation,
                 lightness: hsl.lightness,
-            });
+                stats: lastStats,
+            }, extras));
             state.savedCardId = data.card_id;
             appendCardyMessage('Saved to your collection! You can view and download it anytime from your profile. *beep*', false);
             clearStaleSuggestions();
@@ -761,6 +905,17 @@ body.chat-page .chat-messages.show-cardy-bg {
     //   Suggestion / free-text handling
     //   The wizard step decides what the user's input means.
     // ============================================================
+    function pathValueFromText(lower) {
+        if (lower.includes('talk') || lower.includes('chat') || lower.includes('tell me more')
+            || lower.includes('about you') || lower.includes('about the ship') || lower.includes('learn more')) {
+            return 'chat';
+        }
+        if (lower.includes('remember') || lower.includes('detailed') || lower.includes('longer') || lower.includes('slow')) {
+            return 'long';
+        }
+        return 'fast';
+    }
+
     function handleSuggestion(text) {
         if (state.busy) return;
         clearStaleSuggestions();
@@ -770,20 +925,18 @@ body.chat-page .chat-messages.show-cardy-bg {
         const lower = text.toLowerCase();
 
         if (step === 'greeting') {
-            const wantsChat = lower.includes('tell me more')
-                           || lower.includes('learn more')
-                           || lower.includes('about you')
-                           || lower.includes('about the ship')
-                           || lower.includes('story');
-            const value = wantsChat ? 'chat' : 'card';
-            sendChat({ action: 'select_path', value });
+            const value = pathValueFromText(lower);
+            sendChat({ action: 'select_path', value, user_message: text });
             return;
         }
 
-        if (state.mode === 'free_chat') {
-            // "Let's make a card" while chatting kicks the user into the wizard.
-            if (lower.includes("let's make") || lower.includes('make a card') || lower.includes('start the card')) {
-                sendChat({ action: 'select_path', value: 'card' });
+        if (state.mode === 'free_chat' || state.path === 'chat') {
+            if (lower.includes('detailed') || lower.includes('longer')) {
+                sendChat({ action: 'select_path', value: 'long', user_message: text });
+                return;
+            }
+            if (lower.includes('make a card') || lower.includes("let's make") || lower.includes('start the card') || lower.includes('yeah, make')) {
+                sendChat({ action: 'select_path', value: 'fast', user_message: text });
                 return;
             }
             sendChat({ user_message: text });
@@ -791,7 +944,7 @@ body.chat-page .chat-messages.show-cardy-bg {
         }
 
         if (step === 'confirm') {
-            if (lower.includes('paint') || lower.includes('yes') || lower === 'paint it!') {
+            if (lower.includes('paint')) {
                 sendChat({ action: 'confirm', user_message: text });
                 return;
             }
@@ -800,7 +953,8 @@ body.chat-page .chat-messages.show-cardy-bg {
         }
 
         if (step === 'reveal') {
-            if (lower.includes('draw')) openStudio(true);
+            if (lower.includes('draw')) openCardApp('draw');
+            else if (lower.includes('view')) openCardApp('viewer');
             else if (lower.includes('download')) handleSaveFramed(true);
             else if (lower.includes('change') || lower.includes('tweak')) promptRevise();
             else if (lower.startsWith('save')) handleSaveFramed(false);
@@ -808,16 +962,13 @@ body.chat-page .chat-messages.show-cardy-bg {
             return;
         }
 
-        // Default: it's an answer to one of the wizard questions.
-        sendChat({ action: 'advance', user_message: text });
+        // Agenda gather: server owns landing
+        sendChat({ user_message: text });
     }
 
     function handleFreeText(text) {
         if (state.busy || !text) return;
 
-        // If the intro hasn't been continued through yet, treat any typed
-        // input as "let's go" -- skip the rest of the intro and show
-        // Cardy's greeting now (assuming it's loaded).
         if (!state.introComplete) {
             if (state.greetingReady) {
                 if ($introContinue) $introContinue.classList.add('hidden');
@@ -830,20 +981,23 @@ body.chat-page .chat-messages.show-cardy-bg {
         appendUserMessage(text);
 
         const step = state.step;
-        if (state.mode === 'free_chat') {
+        if (state.mode === 'free_chat' || state.path === 'chat') {
             sendChat({ user_message: text });
             return;
         }
         if (step === 'greeting') {
-            // If they typed their answer instead of tapping, treat as wanting to make a card.
-            sendChat({ action: 'select_path', value: 'card', user_message: text });
+            sendChat({ action: 'select_path', value: pathValueFromText(text.toLowerCase()), user_message: text });
+            return;
+        }
+        if (step === 'confirm') {
+            sendChat({ user_message: text });
             return;
         }
         if (step === 'reveal') {
             sendChat({ user_message: text });
             return;
         }
-        sendChat({ action: 'advance', user_message: text });
+        sendChat({ user_message: text });
     }
 
     // ============================================================
@@ -861,17 +1015,22 @@ body.chat-page .chat-messages.show-cardy-bg {
             state.sessionId     = data.session_id || state.sessionId;
             state.step          = data.step || state.step;
             state.mode          = data.mode || state.mode;
+            state.path          = data.path || state.path;
             state.readyToRender = !!data.ready_to_render;
             if (data.visual_concept) {
                 state.visualConcept = data.visual_concept;
                 lastConcept = data.visual_concept;
             }
+            if (data.stats) lastStats = data.stats;
 
             hideTypingIndicator();
 
             if (state.step === 'confirm') {
-                fillConfirmPanel(data.visual_concept || lastConcept);
-            } else {
+                fillConfirmPanel(
+                    data.visual_concept || lastConcept,
+                    data.nickname_suggestions || []
+                );
+            } else if (state.step !== 'ready' && state.step !== 'rendering') {
                 hideConfirmPanel();
             }
 
@@ -879,18 +1038,28 @@ body.chat-page .chat-messages.show-cardy-bg {
                 const el = appendCardyMessage(data.message, true);
                 if (state.step === 'reveal') {
                     const textLen = (data.message || '').length;
-                    const delay = Math.min(textLen * 26 + 600, 4500);
+                    const delay = Math.min(textLen * 26 + 400, 2000);
                     setTimeout(() => appendRevealActionsAfter(el), delay);
-                } else if (state.step !== 'rendering' && state.step !== 'studio') {
+                } else if (state.step === 'confirm') {
+                    // Panel owns Paint CTA + nickname chips
+                    if (data.visual_concept && data.visual_concept.nickname) {
+                        document.getElementById('confirmNickname').value = data.visual_concept.nickname;
+                    }
+                } else if (state.step !== 'rendering' && state.step !== 'studio' && state.step !== 'ready') {
                     appendSuggestionsAfter(el, data.suggestions);
                 }
             }
 
-            if (data.auto_render || ((state.step === 'ready' || state.readyToRender) && payload && payload.action === 'revise')) {
-                showRenderButton();
-                handleRender();
-            } else if (state.step === 'ready' || state.readyToRender) {
-                showRenderButton();
+            // Paint only on explicit auto_render (Paint CTA or revise).
+            // Defer until after finally clears busy; calling handleRender while
+            // sendChat still holds busy made it no-op (no spinner, no paint).
+            if (data.auto_render) {
+                hideConfirmPanel();
+                hideRenderButton();
+                clearStaleSuggestions();
+                showImageLoading(data.message || '');
+                state.pendingRender = true;
+                state.pendingRenderStatus = data.message || '';
             } else {
                 hideRenderButton();
             }
@@ -907,6 +1076,10 @@ body.chat-page .chat-messages.show-cardy-bg {
             $messageInput.value = '';
             autoResize();
             if (window.innerWidth > 768) $messageInput.focus();
+            if (state.pendingRender) {
+                state.pendingRender = false;
+                handleRender();
+            }
         }
     }
 
@@ -914,7 +1087,9 @@ body.chat-page .chat-messages.show-cardy-bg {
     //   Render flow
     // ============================================================
     async function handleRender() {
-        if (state.busy || !state.sessionId) return;
+        if (!state.sessionId) return;
+        if (state.renderInFlight) return;
+        state.renderInFlight = true;
         hideRenderButton();
 
         // Tear down any previous image / poll state from a prior render
@@ -931,7 +1106,8 @@ body.chat-page .chat-messages.show-cardy-bg {
         }
         state.imageElement = null;
 
-        showImageLoading();
+        showImageLoading(state.pendingRenderStatus || '');
+        state.pendingRenderStatus = '';
         setBusy(true);
 
         try {
@@ -952,6 +1128,7 @@ body.chat-page .chat-messages.show-cardy-bg {
             appendError('Could not start rendering: ' + err.message);
             showRenderButton();
         } finally {
+            state.renderInFlight = false;
             setBusy(false);
         }
     }
@@ -999,6 +1176,14 @@ body.chat-page .chat-messages.show-cardy-bg {
                 }
             } catch (err) {
                 console.warn('poll error:', err.message);
+                if (state.imagePollAttempts >= 3) {
+                    state.imagePollAborted = true;
+                    state.imagePollHandle = null;
+                    removeImageLoading();
+                    appendError('Paint status failed: ' + err.message);
+                    showRenderButton();
+                    return;
+                }
             }
 
             if (state.imagePollAttempts >= maxAttempts) {
@@ -1105,6 +1290,7 @@ body.chat-page .chat-messages.show-cardy-bg {
             vibe: document.getElementById('confirmVibe').value.trim(),
             details: document.getElementById('confirmDetails').value.trim(),
         };
+        hideConfirmPanel();
         sendChat({ action: 'confirm', user_message: 'Paint it!', concept_patch: patch });
     });
     document.getElementById('confirmUpdateBtn').addEventListener('click', () => {

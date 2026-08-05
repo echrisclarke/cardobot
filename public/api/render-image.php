@@ -1,57 +1,38 @@
 <?php
 /**
- * Card-o-Bot image rendering endpoint.
- *
- * POST JSON: { "session_id": "cs_..." }
- *
- * Idempotent: if the session already has an image, returns it immediately
- * (no new OpenAI bill). Otherwise builds a clean prompt from
- * session.visual_concept, kicks off generation, and uses
- * fastcgi_finish_request to do the actual API call in the background while
- * the client gets an immediate task_id to poll via api/image-status.php.
- *
- * Response (already-generated):
- *   { ok: true, status: "completed", image: {url: ...}, image_url: ... }
- *
- * Response (kicked off):
- *   { ok: true, status: "generating", task_id: "img_..." }
+ * Card-o-Bot image rendering endpoint (durable DB tasks + provider facade).
  */
 
+require_once __DIR__ . '/../includes/api.php';
 require_once __DIR__ . '/../includes/auth.php';
-require_once __DIR__ . '/../includes/env.php';
-require_once __DIR__ . '/../includes/openai.php';
+require_once __DIR__ . '/../includes/xai.php';
 require_once __DIR__ . '/../includes/state.php';
 require_once __DIR__ . '/../includes/prompt_compiler.php';
 require_once __DIR__ . '/../includes/ml_client.php';
+require_once __DIR__ . '/../includes/image_tasks.php';
+require_once __DIR__ . '/../includes/stats.php';
 
-header('Content-Type: application/json; charset=utf-8');
-
-if (!is_logged_in()) {
-    http_response_code(401);
-    echo json_encode(['ok' => false, 'error' => 'Authentication required']);
-    exit;
-}
-
+api_boot(false);
+api_assert_same_origin();
+$user = api_require_login();
 ensure_user_row();
-$user = get_logged_in_user();
 $username = $user['username'] ?? '';
-
-$raw = file_get_contents('php://input');
-$data = json_decode($raw, true);
-if (!is_array($data)) {
-    $data = [];
+$userId = (int)($user['id'] ?? 0);
+if ($userId <= 0) {
+    $userId = (int)(ensure_user_row() ?: 0);
 }
 
+$data = api_require_post_json();
 $sessionId = isset($data['session_id']) && is_string($data['session_id']) ? trim($data['session_id']) : '';
 if ($sessionId === '') {
-    http_response_code(400);
-    echo json_encode(['ok' => false, 'error' => 'session_id is required']);
-    exit;
+    api_error('missing_session', 'session_id is required', 400);
 }
 
-$session = cardy_session_get($sessionId);
+$session = cardy_session_find($sessionId);
+if ($session === null) {
+    api_error('unknown_session', 'Unknown session_id', 404);
+}
 
-// ---- Idempotent: if already generated, return cached result -------------
 if (!empty($session['image_url']) || !empty($session['image_b64'])) {
     $image = [];
     if (!empty($session['image_url'])) {
@@ -60,29 +41,26 @@ if (!empty($session['image_url']) || !empty($session['image_b64'])) {
     if (!empty($session['image_b64'])) {
         $image['b64_json'] = $session['image_b64'];
     }
-    echo json_encode([
-        'ok'        => true,
-        'status'    => 'completed',
-        'image'     => $image,
+    api_json([
+        'ok' => true,
+        'status' => 'completed',
+        'image' => $image,
         'image_url' => $session['image_url'],
-        'cached'    => true,
+        'cached' => true,
+        'stats' => $session['stats'] ?? null,
     ]);
-    exit;
 }
 
-// ---- Validate concept ---------------------------------------------------
 $concept = $session['visual_concept'] ?? null;
 if (!is_array($concept) || empty($concept['subject'])) {
-    http_response_code(400);
-    echo json_encode([
-        'ok' => false,
-        'error' => 'No visual concept yet. Finish the wizard first.',
-    ]);
-    exit;
+    api_error('no_concept', 'No visual concept yet. Finish the wizard first.', 400);
 }
 
-// ---- Build the image prompt --------------------------------------------
-$userId = (int)($user['id'] ?? 0);
+if (empty($session['stats'])) {
+    $session['stats'] = cardobot_generate_stats($concept);
+    cardy_session_save($session);
+}
+
 $memoryHints = [];
 $hintSeed = trim(($concept['subject'] ?? '') . ' ' . ($concept['details'] ?? ''));
 if ($userId > 0 && $hintSeed !== '') {
@@ -92,88 +70,60 @@ $prompt = build_render_prompt($concept, $memoryHints);
 
 $safety = ml_safety_check($prompt);
 if (isset($safety['safe']) && $safety['safe'] === false) {
-    http_response_code(400);
-    echo json_encode([
-        'ok' => false,
-        'error' => 'That concept looks a little too spicy for the ship printers. Want to tweak it?',
-    ]);
-    exit;
+    api_error('unsafe_concept', 'That concept looks a little too spicy for the ship printers. Want to tweak it?', 400);
 }
 
-// ---- Mint a task and store in session ----------------------------------
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
-if (!isset($_SESSION['image_tasks']) || !is_array($_SESSION['image_tasks'])) {
-    $_SESSION['image_tasks'] = [];
-}
-
-$taskId = 'img_' . time() . '_' . bin2hex(random_bytes(3));
-
-// 'source' tells image-status.php who's responsible for actually calling
-// OpenAI. With fastcgi we own it from this request; otherwise the first
-// poll to image-status.php takes over. Without this flag image-status
-// would fire its own concurrent OpenAI calls on every 1s poll.
 $useFastcgi = function_exists('fastcgi_finish_request');
-
-$_SESSION['image_tasks'][$taskId] = [
-    'status'         => 'generating',
-    'prompt'         => $prompt,
-    'visual_data'    => $concept,
-    'card_session'   => $session['id'],
-    'username'       => $username,
-    'created_at'     => time(),
-    'source'         => $useFastcgi ? 'fastcgi' : 'inline',
-];
+$source = $useFastcgi ? 'fastcgi' : 'inline';
+$taskId = image_task_create($userId, $session['id'], $prompt, $source, $concept);
+if ($taskId === null) {
+    api_error('task_create_failed', 'Could not start paint job', 500);
+}
 
 $session = cardy_session_set_image_task($session, $taskId);
+$session['step'] = CARDY_STEP_RENDERING;
 cardy_session_save($session);
 
 $response = [
-    'ok'         => true,
-    'status'     => 'generating',
-    'task_id'    => $taskId,
+    'ok' => true,
+    'status' => 'generating',
+    'task_id' => $taskId,
     'session_id' => $session['id'],
 ];
 
 if ($useFastcgi) {
+    http_response_code(200);
+    header('Content-Type: application/json; charset=utf-8');
     echo json_encode($response);
     fastcgi_finish_request();
 
-    $result = openai_image($prompt, ['size' => '1024x1024', 'quality' => 'high']);
-
+    $result = generate_card_image($prompt);
     if (!$result['ok']) {
-        $_SESSION['image_tasks'][$taskId]['status'] = 'failed';
-        $_SESSION['image_tasks'][$taskId]['error']  = $result['error'] ?? 'Image generation failed';
-        error_log('render-image (async) failed: ' . ($result['error'] ?? 'unknown'));
-        // Refresh session to get latest copy in case other requests modified it.
-        $session = cardy_session_get($session['id']);
-        $session['step'] = CARDY_STEP_READY; // back to ready so user can retry
+        image_task_update($taskId, [
+            'status' => 'failed',
+            'error' => $result['error'] ?? 'Image generation failed',
+        ]);
+        $session = cardy_session_find($sessionId) ?? $session;
+        $session['step'] = CARDY_STEP_READY;
         cardy_session_save($session);
         exit;
     }
 
     $img = $result['image'];
-    $_SESSION['image_tasks'][$taskId] = [
-        'status'        => 'completed',
-        'image'         => $img,
-        'visual_data'   => $concept,
-        'card_session'  => $session['id'],
-        'username'      => $username,
-        'created_at'    => $_SESSION['image_tasks'][$taskId]['created_at'],
-        'completed_at'  => time(),
-    ];
+    $localUrl = persist_generated_art($userId, $sessionId, $img);
+    $finalUrl = $localUrl ?: ($img['url'] ?? null);
+    image_task_update($taskId, [
+        'status' => 'completed',
+        'image_url' => $finalUrl,
+        'error' => null,
+    ]);
 
-    $session = cardy_session_get($session['id']);
-    $session = cardy_session_set_image(
-        $session,
-        $img['url'] ?? null,
-        $img['b64_json'] ?? null
-    );
+    $session = cardy_session_find($sessionId) ?? $session;
+    $session = cardy_session_set_image($session, $finalUrl, $localUrl ? null : ($img['b64_json'] ?? null));
+    $session['art_url'] = $finalUrl;
+    $session['step'] = CARDY_STEP_REVEAL;
     cardy_session_save($session);
     exit;
 }
 
-// No fastcgi_finish_request -- the existing api/image-status.php endpoint
-// will run the generation on the client's first poll. Just return the task.
-echo json_encode($response);
+api_json($response);

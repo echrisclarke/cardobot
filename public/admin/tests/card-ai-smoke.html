@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Card AI smoke</title>
+  <link rel="stylesheet" href="../../assets/css/studio.css">
+  <style>
+    body { font-family: system-ui, sans-serif; background: #1c1c1c; color: #eee; padding: 1rem; }
+    .row { display: flex; flex-wrap: wrap; gap: 1.25rem; align-items: flex-start; }
+    .case { background: #2a2a2a; padding: 0.75rem; border-radius: 8px; max-width: 340px; }
+    .case h3 { margin: 0 0 0.35rem; font-size: 0.95rem; }
+    .meta { font-size: 12px; color: #bbb; white-space: pre-wrap; margin: 0.5rem 0 0; }
+    #report { margin-top: 1rem; font-family: ui-monospace, monospace; font-size: 12px; white-space: pre-wrap; }
+    .pass { color: #7dffa0; }
+    .fail { color: #ff8a8a; }
+    a { color: #8ecfff; }
+  </style>
+</head>
+<body>
+  <h1>Card AI smoke</h1>
+  <p>
+    Loads <code>smoke-out/manifest.json</code> from
+    <a href="run-card-ai-smoke.php">run-card-ai-smoke.php</a>
+    (or <code>php run-card-ai-smoke.php</code>).
+  </p>
+  <div class="row" id="cases"></div>
+  <div id="report"></div>
+
+  <script src="../../assets/js/card-layout.js"></script>
+  <script src="../../assets/js/drawing-engine.js"></script>
+  <script src="../../assets/js/card-studio.js"></script>
+  <script>
+    const assetBase = '../..';
+
+    function overflow(el) {
+      if (!el || !el.textContent) return false;
+      if (el.classList && (el.classList.contains('studio-power') || el.classList.contains('studio-ability'))) {
+        const left = el.querySelector('span');
+        return el.scrollWidth > el.clientWidth + 1
+          || (left && left.scrollWidth > left.clientWidth + 1);
+      }
+      const multi = (el._box && (el._box.maxLines || 1) > 1);
+      return multi
+        ? el.scrollHeight > el.clientHeight + 1
+        : el.scrollWidth > el.clientWidth + 1;
+    }
+
+    function hasEllipsis(el) {
+      if (!el) return false;
+      const t = el.textContent || '';
+      if (t.includes('...') || t.includes('…')) return true;
+      return getComputedStyle(el).textOverflow === 'ellipsis';
+    }
+
+    async function renderCard(entry, idx) {
+      const wrap = document.createElement('div');
+      wrap.className = 'case';
+      const title = (entry.concept && (entry.concept.nickname || entry.concept.subject)) || ('Card ' + (idx + 1));
+      wrap.innerHTML = '<h3></h3><div class="host"></div><pre class="meta"></pre>';
+      wrap.querySelector('h3').textContent = title;
+      document.getElementById('cases').appendChild(wrap);
+
+      if (!entry.concept) {
+        wrap.querySelector('.meta').textContent = 'ERROR: ' + (entry.error || 'no concept');
+        return { name: title, fails: ['no concept'] };
+      }
+
+      const studio = new window.CardobotStudio({
+        root: wrap.querySelector('.host'),
+        assetBase,
+        frameUrl: assetBase + '/assets/img/01_Card.png',
+        bgUrl: assetBase + '/assets/img/01_CardBGtexture.png',
+        hideTools: true,
+      });
+      studio.setConcept(entry.concept, entry.stats || {});
+      if (entry.art && !/^https?:/i.test(entry.art)) {
+        await studio.setArt('smoke-out/' + entry.art);
+      } else if (entry.art) {
+        await studio.setArt(entry.art);
+      }
+      await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+      await new Promise((r) => setTimeout(r, 80));
+
+      const fails = [];
+      [
+        studio.nickEl, studio.bioEl, studio.powerEl, studio.abilityEl,
+        studio.creditEl, studio.hpEl,
+      ].forEach((el) => {
+        if (!el) return;
+        if (overflow(el)) fails.push((el.className || 'field') + ' overflow');
+        if (hasEllipsis(el)) fails.push((el.className || 'field') + ' ellipsis');
+        if (el.classList.contains('studio-power')) {
+          el.querySelectorAll('span').forEach((span, i) => {
+            if (hasEllipsis(span) || (span.textContent || '').includes('...')) {
+              fails.push('power span' + i + ' ellipsis');
+            }
+          });
+        }
+      });
+      Object.values(studio.statEls || {}).forEach((el) => {
+        if (overflow(el)) fails.push(el.className + ' overflow');
+      });
+      if (!entry.ok_art) fails.push('art missing');
+
+      wrap.querySelector('.meta').textContent = [
+        (entry.concept.type || '') + ' · ' + (entry.concept.power_name || '') + ' ' + (entry.concept.power_value || ''),
+        ((entry.concept.ability_name || '') + ' ' + (entry.concept.ability_line || '')).trim(),
+        'ink ' + (entry.concept.name_ink || '?') + ' / stats ' + (entry.concept.stats_ink || '?') + ' / bg ' + (entry.concept.card_bg || '?'),
+        entry.art ? ('art: ' + entry.art + (entry.provider ? ' via ' + entry.provider : '')) : 'no art',
+        fails.length ? ('FAIL: ' + fails.join('; ')) : 'layout ok',
+      ].join('\n');
+
+      return { name: title, fails };
+    }
+
+    (async function main() {
+      const report = document.getElementById('report');
+      let manifest;
+      try {
+        const res = await fetch('smoke-out/manifest.json?v=' + Date.now());
+        if (!res.ok) throw new Error('manifest HTTP ' + res.status);
+        manifest = await res.json();
+      } catch (e) {
+        report.innerHTML = '<div class="fail">No manifest yet. Run <a href="run-card-ai-smoke.php">run-card-ai-smoke.php</a> first.<br>'
+          + String(e.message || e) + '</div>';
+        document.title = 'FAIL card AI smoke';
+        return;
+      }
+
+      const results = [];
+      for (let i = 0; i < (manifest.cards || []).length; i++) {
+        results.push(await renderCard(manifest.cards[i], i));
+      }
+      let failed = 0;
+      const lines = results.map((r) => {
+        if (r.fails.length) {
+          failed++;
+          return 'FAIL ' + r.name + ': ' + r.fails.join('; ');
+        }
+        return 'PASS ' + r.name;
+      });
+      lines.push(failed ? ('\n' + failed + ' failed') : '\nAll AI smoke cards passed layout checks');
+      lines.push('Generated ' + (manifest.generated_at || '') + ' in ' + (manifest.elapsed_sec || '?') + 's');
+      report.innerHTML = lines.map((l) =>
+        '<div class="' + (l.startsWith('FAIL') ? 'fail' : 'pass') + '">' + l + '</div>'
+      ).join('');
+      document.title = failed ? 'FAIL card AI smoke' : 'PASS card AI smoke';
+      window.__cardAiSmoke = { failed, results, manifest };
+    })();
+  </script>
+</body>
+</html>

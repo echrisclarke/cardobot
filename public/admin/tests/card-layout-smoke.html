@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Card layout smoke test</title>
+  <link rel="stylesheet" href="../../assets/css/studio.css">
+  <style>
+    body { font-family: system-ui, sans-serif; background: #222; color: #eee; padding: 1rem; }
+    .row { display: flex; flex-wrap: wrap; gap: 1.25rem; align-items: flex-start; }
+    .case { background: #333; padding: 0.75rem; border-radius: 8px; }
+    .case h3 { margin: 0 0 0.5rem; font-size: 0.9rem; }
+    #report { margin-top: 1rem; white-space: pre-wrap; font-family: ui-monospace, monospace; font-size: 12px; }
+    .pass { color: #7dffa0; }
+    .fail { color: #ff8a8a; }
+    .debug .studio-text > div { outline: 1px solid rgba(255, 80, 80, 0.55); }
+  </style>
+</head>
+<body>
+  <h1>Card layout smoke</h1>
+  <p>Name vs art · HP ≤ name · credit in art · stats left · power tops · shrink-to-fit</p>
+  <div class="row" id="cases"></div>
+  <div id="report"></div>
+
+  <script src="../../assets/js/card-layout.js"></script>
+  <script src="../../assets/js/drawing-engine.js"></script>
+  <script src="../../assets/js/card-studio.js"></script>
+  <script>
+    const assetBase = '../..';
+    const bios = {
+      short: 'Satchel of bolts.',
+      medium: 'Satchel bulging with bolts, always one missing on purpose.',
+      long: 'A dock kid who keeps a satchel bulging with bolts, spare washers, a lucky coin, and a half-finished star map folded into the lining so it never quite lies flat when the printers hum.',
+    };
+
+    function overflow(el) {
+      if (!el) return true;
+      const multi = (el._box && (el._box.maxLines || 1) > 1);
+      return multi
+        ? el.scrollHeight > el.clientHeight + 1
+        : el.scrollWidth > el.clientWidth + 1;
+    }
+
+    function inCardBounds(el, card) {
+      const er = el.getBoundingClientRect();
+      const cr = card.getBoundingClientRect();
+      const pad = 0.5;
+      return er.left >= cr.left - pad
+        && er.right <= cr.right + pad
+        && er.top >= cr.top - pad
+        && er.bottom <= cr.bottom + pad;
+    }
+
+    function pct(el, card) {
+      const er = el.getBoundingClientRect();
+      const cr = card.getBoundingClientRect();
+      return {
+        x: ((er.left + er.right) / 2 - cr.left) / cr.width,
+        y: ((er.top + er.bottom) / 2 - cr.top) / cr.height,
+        top: (er.top - cr.top) / cr.height,
+        left: (er.left - cr.left) / cr.width,
+        right: (er.right - cr.left) / cr.width,
+        bottom: (er.bottom - cr.top) / cr.height,
+      };
+    }
+
+    async function runCase(name, concept, stats) {
+      const wrap = document.createElement('div');
+      wrap.className = 'case debug';
+      wrap.innerHTML = '<h3></h3><div class="host"></div>';
+      wrap.querySelector('h3').textContent = name;
+      document.getElementById('cases').appendChild(wrap);
+
+      const studio = new window.CardobotStudio({
+        root: wrap.querySelector('.host'),
+        assetBase,
+        frameUrl: assetBase + '/assets/img/01_Card.png',
+        bgUrl: assetBase + '/assets/img/01_CardBGtexture.png',
+        hideTools: true,
+      });
+      studio.setConcept(concept, stats);
+      await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+      await new Promise((r) => setTimeout(r, 60));
+
+      const fails = [];
+      const checks = [
+        ['nickname', studio.nickEl],
+        ['credit', studio.creditEl],
+        ['type', studio.typeEl],
+        ['height', studio.heightEl],
+        ['mass', studio.massEl],
+        ['hp', studio.hpEl],
+        ['bio', studio.bioEl],
+        ['power', studio.powerEl],
+        ['ability', studio.abilityEl],
+        ...Object.keys(studio.statEls).map((k) => ['stat-' + k, studio.statEls[k]]),
+      ];
+      checks.forEach(([label, el]) => {
+        if (!el || !el.textContent) {
+          fails.push(label + ' missing');
+          return;
+        }
+        const powerOverflow = (label === 'power' || label === 'ability')
+          ? (el.scrollWidth > el.clientWidth + 1
+            || Array.from(el.querySelectorAll('span')).some((s) => s.scrollWidth > s.clientWidth + 1))
+          : overflow(el);
+        if (powerOverflow) fails.push(label + ' overflow (did not shrink-to-fit)');
+        if (!inCardBounds(el, studio.card)) fails.push(label + ' outside card');
+        if ((el.textContent || '').includes('...') || (el.textContent || '').includes('…')
+          || getComputedStyle(el).textOverflow === 'ellipsis') {
+          fails.push(label + ' ellipsis');
+        }
+        if (label === 'power') {
+          el.querySelectorAll('span').forEach((span, i) => {
+            if (getComputedStyle(span).textOverflow === 'ellipsis'
+              || (span.textContent || '').includes('...')
+              || (span.textContent || '').includes('…')) {
+              fails.push('power span' + i + ' ellipsis');
+            }
+          });
+        }
+        // Mid-token chops should not appear; shrink-to-fit trims on word boundaries only
+        if (/(STATIC T|ARE S|printers hu|Fold E)$/i.test(el.textContent.trim())) {
+          fails.push(label + ' looks mid-token chopped');
+        }
+      });
+
+      const artLeft = window.CardobotLayout.ART.x / window.CardobotLayout.CARD_W;
+      const nickP = pct(studio.nickEl, studio.card);
+      if (nickP.left + 0.002 < artLeft) fails.push('nickname left of art (' + nickP.left.toFixed(3) + ')');
+      if (nickP.top < 0.040) fails.push('nickname too high (' + nickP.top.toFixed(3) + ')');
+      if (nickP.top > 0.075) fails.push('nickname too low (' + nickP.top.toFixed(3) + ')');
+
+      const nickFs = Number(studio.nickEl.dataset.fitSize || 0);
+      const hpFs = Number(studio.hpEl.dataset.fitSize || 0);
+      if (nickFs && hpFs && hpFs > nickFs) fails.push('hp bigger than name (' + hpFs + '>' + nickFs + ')');
+
+      const creditP = pct(studio.creditEl, studio.card);
+      // Inside art well (art bottom ~0.718)
+      if (creditP.bottom > 0.72) fails.push('credit below art (' + creditP.bottom.toFixed(3) + ')');
+      if (creditP.top < 0.62) fails.push('credit too high (' + creditP.top.toFixed(3) + ')');
+      if (/\d{1,2}\/\d{1,2}\/\d{2,4}/.test(studio.creditEl.textContent)) {
+        fails.push('credit looks like a birthday');
+      }
+
+      const hpP = pct(studio.hpEl, studio.card);
+      // Centered in HP digit cutout
+      if (hpP.x < 0.84 || hpP.x > 0.93) fails.push('hp x off cutout (' + hpP.x.toFixed(3) + ')');
+
+      Object.keys(studio.statEls).forEach((k) => {
+        const p = pct(studio.statEls[k], studio.card);
+        // Left edge lined up with printed NPO/ATT/… titles
+        if (p.left < 0.10 || p.left > 0.15) fails.push('stat-' + k + ' left off titles (' + p.left.toFixed(3) + ')');
+      });
+
+      const bioP = pct(studio.bioEl, studio.card);
+      if (bioP.bottom > 0.852) fails.push('bio into power panel (' + bioP.bottom.toFixed(3) + ')');
+
+      const powP = pct(studio.powerEl, studio.card);
+      const abP = pct(studio.abilityEl, studio.card);
+      // Shared full-width value column + printed label bands
+      if (Math.abs(powP.left - abP.left) > 0.004) {
+        fails.push('power/ability left mismatch (' + powP.left.toFixed(3) + ' vs ' + abP.left.toFixed(3) + ')');
+      }
+      if (powP.left < 0.40 || powP.left > 0.46) fails.push('power left off value column (' + powP.left.toFixed(3) + ')');
+      if (powP.right < 0.88) fails.push('power well too short on right (' + powP.right.toFixed(3) + ')');
+      if (abP.right < 0.88) fails.push('ability well too short on right (' + abP.right.toFixed(3) + ')');
+      if (powP.top < 0.855 || powP.top > 0.885) fails.push('power top off labels (' + powP.top.toFixed(3) + ')');
+      if (abP.top < 0.880 || abP.top > 0.915) fails.push('ability top off labels (' + abP.top.toFixed(3) + ')');
+      if ((abP.top - powP.top) < 0.020 || (abP.top - powP.top) > 0.040) {
+        fails.push('power/ability row pitch off (' + (abP.top - powP.top).toFixed(3) + ')');
+      }
+      if (abP.top <= powP.top) fails.push('ability not below power');
+      if (concept.power_value && studio.powerEl && !studio.powerEl.textContent.includes(String(concept.power_value).toUpperCase().slice(0, 4))) {
+        fails.push('power value missing from power line');
+      }
+      if (concept.power_mode === 'rule' && studio.bioEl && !/turn|rule|safe|hit/i.test(studio.bioEl.textContent)) {
+        fails.push('rule power missing bio note');
+      }
+
+      return { name, fails, studio, nickP, powP, abP, creditP, nickFs, hpFs };
+    }
+
+    (async function main() {
+      const stats = {
+        hp: 72, npo: 88, att: 41, str: 63, los: 17, con: 95,
+        height: '1.7 m', mass: '68 kg',
+      };
+      const base = {
+        nickname: 'Dock',
+        subject: 'dock kid with bolts',
+        type: 'Human',
+        creator_username: 'HerbieClarke',
+        details: 'blue overalls, satchel of bolts',
+      };
+
+      const results = [];
+      results.push(await runCase('bio-short', {
+        ...base,
+        power_name: 'BOLT HUM',
+        power_mode: 'stat',
+        power_value: '+2 NPO',
+        ability_name: 'WARM SOLDER',
+        ability_line: '+2 STR',
+        name_ink: 'teal',
+        stats_ink: 'mint',
+        card_bg: 'dock_teal',
+        bio: bios.short,
+      }, stats));
+      results.push(await runCase('bio-medium', {
+        ...base,
+        power_name: 'BOLT HUM',
+        power_mode: 'stat',
+        power_value: '+2 NPO',
+        ability_name: 'WARM SOLDER',
+        ability_line: '+2 STR',
+        name_ink: 'rose',
+        stats_ink: 'peach',
+        card_bg: 'rose_mist',
+        bio: bios.medium,
+      }, stats));
+      results.push(await runCase('bio-long', {
+        ...base,
+        nickname: 'Night Map Fold Extra',
+        power_name: 'CARGO TEA STATIC TOO LONG',
+        power_mode: 'rule',
+        power_value: '2T',
+        power_rule_hint: 'Safe from the next hit for 2 turns.',
+        ability_name: 'STEAM MAP',
+        ability_line: '+3 NPO',
+        name_ink: 'charcoal',
+        stats_ink: 'ice',
+        card_bg: 'night_steel',
+        bio: 'Dock kid with a satchel of bolts and a half-finished star map. Safe from the next hit for 2 turns.',
+      }, { hp: 100, npo: 100, att: 7, str: 0, los: 54, con: 66, height: '1.5 m', mass: '54 kg' }));
+
+      const lines = [];
+      let failed = 0;
+      results.forEach((r) => {
+        if (r.fails.length) {
+          failed++;
+          lines.push('FAIL ' + r.name + ': ' + r.fails.join('; '));
+        } else {
+          lines.push('PASS ' + r.name
+            + ' | nickFs=' + r.nickFs + ' hpFs=' + r.hpFs
+            + ' powTop=' + r.powP.top.toFixed(3)
+            + ' creditB=' + r.creditP.bottom.toFixed(3));
+        }
+      });
+      lines.push(failed ? ('\n' + failed + ' case(s) failed') : '\nAll cases passed');
+      const report = document.getElementById('report');
+      report.innerHTML = lines.map((l) =>
+        '<div class="' + (l.startsWith('FAIL') ? 'fail' : 'pass') + '">' + l + '</div>'
+      ).join('');
+      document.title = failed ? 'FAIL card layout smoke' : 'PASS card layout smoke';
+      window.__cardLayoutSmoke = { failed, results: results.map((r) => ({ name: r.name, fails: r.fails })) };
+    })();
+  </script>
+</body>
+</html>

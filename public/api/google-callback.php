@@ -9,21 +9,20 @@ error_reporting(E_ALL);
 ini_set('display_errors', 0); // Disabled in production
 ini_set('log_errors', 1);
 
-// Start session first
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
-
 /**
  * Redirect to login with error message
  * @param string $error Error message
  */
 function redirect_with_error(string $error): void {
-    // get_base_path() is defined in auth.php, which we'll require below
     if (!function_exists('get_base_path')) {
-        // Fallback if auth.php isn't loaded yet
         $host = $_SERVER['HTTP_HOST'] ?? '';
-        $basePath = ($host === 'cardobot.com' || $host === 'www.cardobot.com') ? '' : '/cardobot';
+        $basePath = (
+            $host === 'cardobot.com'
+            || $host === 'www.cardobot.com'
+            || str_contains($host, 'railway.app')
+            || str_contains($host, 'localhost')
+            || str_contains($host, '127.0.0.1')
+        ) ? '' : '/cardobot';
     } else {
         $basePath = get_base_path();
     }
@@ -47,6 +46,7 @@ try {
     }
     
     require_once __DIR__ . '/../includes/auth.php';
+    auth_boot(true);
     
     // Check if Google OAuth is configured
     if (!is_google_oauth_configured()) {

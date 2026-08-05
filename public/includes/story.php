@@ -264,42 +264,24 @@ function generate_and_update_story_chapter(array $cardData, int $userId, ?string
   
   // Build prompt for chapter generation
   // IMPORTANT: Only use the final card data - do NOT reference any conversation history
-  $prompt = "You are Cardy, the ship's core AI who has been alone for 700 years. You are writing a chapter of YOUR story based ONLY on the final card that was created. Do NOT reference any conversations - only use the card data itself.
+  $prompt = "You are Cardy, writing a short private memory note after a visitor printed a card. Use ONLY the card fields below. Do not invent a different character.
 
-CARDY'S CONTEXT:
-- You are the main character - the ship's core AI with immense power
-- You've been active for ~700 years, carrying pain, loneliness, and PTSD
-- You are mostly benevolent but complex - you've caused problems, fixed some, accidentally killed people/robots/critters
-- You are making cards to try to make friends with newcomers and not hurt them
-- You slowly reveal your story through the cards - each card is a fragment of your history
-- The story develops from the CARDS themselves, not from conversations
+CONTEXT:
+- You are the ship console mind. Loneliness is private subtext, not a lecture.
+- The visitor authored this character. Do not overwrite who they are.
+- You may relate the card to your long memory: someone you knew, a hope, a near-miss, a corridor echo.
+- Mysterious, fragmented tone (recovered note). 2-3 short paragraphs max. No trauma dump.
 
-CURRENT MASTER STORY (YOUR STORY SO FAR):
-" . ($currentStory ?: "This is the beginning. You are starting to process your 700 years of existence through the cards you create with newcomers.") . "
+MASTER SUMMARY SO FAR:
+" . ($currentStory ?: "Quiet beginning. New prints are starting to matter.") . "
 
-A NEW CARD HAS BEEN CREATED (A FRAGMENT OF YOUR MEMORY):
-This is the final card output - use ONLY this data to write the chapter. Do not reference how it was created or any conversations.
-
+CARD:
 - Name: " . ($cardData['card_name'] ?? 'Unknown') . "
-- Type: " . ($cardData['type_line'] ?? 'Unknown') . "
+- Note: " . ($cardData['type_line'] ?? '') . "
 - Bio: " . ($cardData['bio'] ?? '') . "
-- Stats: HP " . ($cardData['stats']['hp'] ?? 0) . ", NPO " . ($cardData['stats']['npo'] ?? 0) . ", ATT " . ($cardData['stats']['att'] ?? 0) . ", STR " . ($cardData['stats']['str'] ?? 0) . ", LOS " . ($cardData['stats']['los'] ?? 0) . ", CON " . ($cardData['stats']['con'] ?? 0) . "
 - Ability: " . ($cardData['ability_name'] ?? '') . " - " . ($cardData['ability_effect'] ?? '') . "
-- Physical: Height " . ($cardData['height'] ?? 'unknown') . ", Mass " . ($cardData['mass'] ?? 'unknown') . "
 
-Write a chapter (2-4 paragraphs) from YOUR perspective that:
-1. Uses ONLY the card data above - do not reference conversations or how the card was made
-2. Integrates this character into YOUR story - how they relate to your 700 years of existence
-3. Reveals how they connect to your past, your mistakes, your attempts at connection
-4. Shows how this character is a fragment of YOUR memory - someone you knew, an event you witnessed, a mistake you made, or a hope you had
-5. Maintains the mysterious, fragmented tone (like recovered notes or memories surfacing)
-6. Hints at your pain, loneliness, PTSD, and complexity without fully explaining everything
-7. Builds on YOUR story - the story of a 700-year-old AI trying to connect and process trauma
-8. Shows that YOU are the main character - everything connects back to you and your ship
-
-The chapter should feel like Cardy processing her memories and history through this card. The story develops from the cards themselves, not from conversations.
-
-Return ONLY the chapter text, no title or metadata.";
+Return ONLY the chapter text.";
 
   // Call OpenAI API
   $ch = curl_init('https://api.openai.com/v1/responses');

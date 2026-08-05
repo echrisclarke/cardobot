@@ -4,9 +4,14 @@
  * Handles user login, logout, and session management
  */
 
-// Start session if not already started
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
+require_once __DIR__ . '/api.php';
+
+/**
+ * Ensure a PHP session is available.
+ * Pages/login may create; pass false to only resume (APIs).
+ */
+function auth_boot(bool $create = true): void {
+    api_boot($create);
 }
 
 /**
@@ -14,7 +19,10 @@ if (session_status() === PHP_SESSION_NONE) {
  * @return array|null User data or null if not logged in
  */
 function get_logged_in_user(): ?array {
-    if (!isset($_SESSION['user'])) {
+    if (session_status() === PHP_SESSION_NONE) {
+        auth_boot(false);
+    }
+    if (session_status() === PHP_SESSION_NONE || !isset($_SESSION['user'])) {
         return null;
     }
     return $_SESSION['user'];
@@ -25,6 +33,12 @@ function get_logged_in_user(): ?array {
  * @return bool
  */
 function is_logged_in(): bool {
+    if (session_status() === PHP_SESSION_NONE) {
+        auth_boot(false);
+    }
+    if (session_status() === PHP_SESSION_NONE) {
+        return false;
+    }
     return isset($_SESSION['user']) && !empty($_SESSION['user']['username']);
 }
 
@@ -71,7 +85,8 @@ function get_asset_path(): string {
  * @param string $redirectTo Optional redirect URL after login
  */
 function require_auth(string $redirectTo = ''): void {
-    if (!is_logged_in()) {
+    auth_boot(true);
+    if (!isset($_SESSION['user']) || empty($_SESSION['user']['username'])) {
         $basePath = get_base_path();
         $redirect = !empty($redirectTo) ? '?redirect=' . urlencode($redirectTo) : '';
         header('Location: ' . $basePath . '/login.php' . $redirect);
@@ -201,6 +216,33 @@ function get_user_by_google_id(string $googleId): ?array {
         return $user ?: null;
     } catch (PDOException $e) {
         error_log("Error getting user by Google ID: " . $e->getMessage());
+        return null;
+    }
+}
+
+/**
+ * Get user by email from database
+ * @param string $email
+ * @return array|null User data or null if not found
+ */
+function get_user_by_email(string $email): ?array {
+    $email = trim($email);
+    if ($email === '') {
+        return null;
+    }
+
+    $pdo = get_auth_db();
+    if (!$pdo) {
+        return null;
+    }
+
+    try {
+        $stmt = $pdo->prepare("SELECT * FROM cardobot_users WHERE email = ? LIMIT 1");
+        $stmt->execute([$email]);
+        $user = $stmt->fetch(PDO::FETCH_ASSOC);
+        return $user ?: null;
+    } catch (PDOException $e) {
+        error_log("Error getting user by email: " . $e->getMessage());
         return null;
     }
 }
@@ -447,6 +489,11 @@ function authenticate_user(string $username, string $password): array {
  * @param array $user User data (from database or admin)
  */
 function login_user(array $user): void {
+    auth_boot(true);
+    if (session_status() === PHP_SESSION_ACTIVE) {
+        session_regenerate_id(true);
+    }
+
     // Handle both database format (created_at) and legacy format (created)
     $created = $user['created_at'] ?? $user['created'] ?? date('Y-m-d H:i:s');
     $lastLogin = $user['last_login'] ?? date('Y-m-d H:i:s');
@@ -475,8 +522,22 @@ function is_admin(): bool {
  * Log out current user
  */
 function logout_user(): void {
-    unset($_SESSION['user']);
-    session_destroy();
+    auth_boot(false);
+    if (session_status() === PHP_SESSION_ACTIVE) {
+        $_SESSION = [];
+        if (ini_get('session.use_cookies')) {
+            $params = session_get_cookie_params();
+            setcookie(session_name(), '', [
+                'expires' => time() - 42000,
+                'path' => $params['path'] ?: '/',
+                'domain' => $params['domain'] ?: '',
+                'secure' => (bool)$params['secure'],
+                'httponly' => (bool)$params['httponly'],
+                'samesite' => $params['samesite'] ?? 'Lax',
+            ]);
+        }
+        session_destroy();
+    }
 }
 
 /**

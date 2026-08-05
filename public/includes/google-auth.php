@@ -55,12 +55,16 @@ function get_google_auth_url(string $state): string {
  */
 function get_google_redirect_uri(): string {
     require_once __DIR__ . '/env.php';
+
+    // Prefer APP_URL so auth request + token exchange stay identical.
     $appUrl = get_app_url();
     if ($appUrl !== '') {
         return rtrim($appUrl, '/') . '/api/google-callback.php';
     }
 
-    $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+    $https = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
+        || (isset($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https');
+    $protocol = $https ? 'https' : 'http';
     $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
     $base = '';
     if (str_contains($host, 'herbiecreative.com')) {
@@ -161,8 +165,9 @@ function get_google_user_info(string $accessToken): array {
  * @return string
  */
 function generate_google_state(): string {
+    require_once __DIR__ . '/api.php';
     if (session_status() === PHP_SESSION_NONE) {
-        session_start();
+        api_boot(true);
     }
     $state = bin2hex(random_bytes(16));
     $_SESSION['google_oauth_state'] = $state;
@@ -175,8 +180,9 @@ function generate_google_state(): string {
  * @return bool
  */
 function verify_google_state(string $state): bool {
+    require_once __DIR__ . '/api.php';
     if (session_status() === PHP_SESSION_NONE) {
-        session_start();
+        api_boot(true);
     }
     $storedState = $_SESSION['google_oauth_state'] ?? '';
     unset($_SESSION['google_oauth_state']); // Use once
@@ -370,8 +376,9 @@ function find_or_create_google_user(array $googleUser): array {
         if ($existingUserByEmail && empty($existingUserByEmail['google_id'])) {
             // Email matches existing account without Google link
             // Store Google info in session for linking confirmation
+            require_once __DIR__ . '/api.php';
             if (session_status() === PHP_SESSION_NONE) {
-                session_start();
+                api_boot(true);
             }
             $_SESSION['pending_google_link'] = [
                 'google_id' => $googleId,

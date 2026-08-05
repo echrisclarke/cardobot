@@ -4,8 +4,10 @@
  * Generates and saves emoji images as fallbacks for systems that don't support them
  */
 
+require_once __DIR__ . '/../includes/api.php';
 require_once __DIR__ . '/../includes/auth.php';
 
+api_boot(false);
 header('Content-Type: application/json; charset=utf-8');
 
 // Get emoji from request
@@ -13,13 +15,13 @@ $emoji = $_GET['emoji'] ?? $_POST['emoji'] ?? '';
 
 if (empty($emoji)) {
     http_response_code(400);
-    echo json_encode(['error' => 'No emoji provided']);
+    echo json_encode(['ok' => false, 'error' => 'No emoji provided', 'message' => 'No emoji provided']);
     exit;
 }
 
 // Get the base directory
 $baseDir = __DIR__ . '/../assets/img/emoji';
-$assetPath = '/cardobot/assets/img/emoji';
+$assetPath = get_base_path() . '/assets/img/emoji';
 
 // Create emoji directory if it doesn't exist
 if (!is_dir($baseDir)) {
@@ -132,7 +134,7 @@ if ($ch === false) {
 
 curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
 curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
-curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
 curl_setopt($ch, CURLOPT_TIMEOUT, 10);
 curl_setopt($ch, CURLOPT_USERAGENT, 'Card-o-Bot Emoji Fallback Generator');
 

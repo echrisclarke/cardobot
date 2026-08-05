@@ -1,4 +1,7 @@
 <?php
+require_once __DIR__ . '/includes/api.php';
+api_boot();
+api_deny_public_probe();
 /**
  * Google OAuth Configuration Test
  * Tests Google OAuth setup and configuration

@@ -4,6 +4,7 @@
  */
 
 require_once __DIR__ . '/includes/auth.php';
+auth_boot(true);
 
 $basePath = get_base_path();
 
@@ -19,20 +20,11 @@ if (file_exists(__DIR__ . '/includes/google-auth.php')) {
     }
 }
 
-// Central Login Authority handoff URL for the Google button.
-// herbiecreative.com is the only domain Google ever redirects to; cardobot.com
-// receives a signed one-time token at /auth/complete.php afterwards.
-$cardobotHost = $_SERVER['HTTP_HOST'] ?? 'cardobot.com';
-if ($cardobotHost === 'cardobot.com' || $cardobotHost === 'www.cardobot.com') {
-    $googleReturnUrl = 'https://' . $cardobotHost . '/auth/complete.php';
-} else {
-    $googleReturnUrl = 'https://herbiecreative.com/cardobot/auth/complete.php';
+// Direct Google OAuth on this host (Railway / cardobot.com). No Bluehost handoff.
+$googleStartUrl = $basePath . '/api/google-start.php';
+if (!empty($_GET['redirect'])) {
+    $googleStartUrl .= '?' . http_build_query(['redirect' => (string)$_GET['redirect']]);
 }
-$googleStartUrl = 'https://herbiecreative.com/auth/google-start.php?'
-    . http_build_query([
-        'app' => 'cardobot',
-        'return' => $googleReturnUrl,
-    ]);
 
 // If already logged in, redirect to main app
 if (is_logged_in()) {

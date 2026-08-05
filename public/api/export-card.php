@@ -3,32 +3,23 @@
  * Accept a finished card PNG (and optional drawing JSON), store it, save to DB.
  */
 
+require_once __DIR__ . '/../includes/api.php';
 require_once __DIR__ . '/../includes/auth.php';
-require_once __DIR__ . '/../includes/env.php';
 require_once __DIR__ . '/../includes/state.php';
 require_once __DIR__ . '/../includes/cards.php';
 require_once __DIR__ . '/../includes/ml_client.php';
+require_once __DIR__ . '/../includes/stats.php';
 
-header('Content-Type: application/json; charset=utf-8');
-
-if (!is_logged_in()) {
-    http_response_code(401);
-    echo json_encode(['ok' => false, 'error' => 'Authentication required']);
-    exit;
-}
+api_boot(false);
+api_assert_same_origin();
+api_require_login();
 
 $userId = ensure_user_row();
 if (!$userId) {
-    http_response_code(500);
-    echo json_encode(['ok' => false, 'error' => 'Could not load your account']);
-    exit;
+    api_error('account_error', 'Could not load your account', 500);
 }
 
-$raw = file_get_contents('php://input');
-$data = json_decode($raw, true);
-if (!is_array($data)) {
-    $data = [];
-}
+$data = api_require_post_json();
 
 $sessionId = isset($data['session_id']) && is_string($data['session_id']) ? trim($data['session_id']) : '';
 $composite = isset($data['composite_png']) && is_string($data['composite_png']) ? $data['composite_png'] : '';
@@ -38,32 +29,28 @@ $sat = isset($data['saturation']) ? (int)$data['saturation'] : null;
 $light = isset($data['lightness']) ? (int)$data['lightness'] : null;
 
 if ($sessionId === '' || $composite === '') {
-    http_response_code(400);
-    echo json_encode(['ok' => false, 'error' => 'session_id and composite_png are required']);
-    exit;
+    api_error('missing_fields', 'session_id and composite_png are required', 400);
 }
 
 if (!preg_match('#^data:image/png;base64,#', $composite)) {
-    http_response_code(400);
-    echo json_encode(['ok' => false, 'error' => 'composite_png must be a PNG data URL']);
-    exit;
+    api_error('invalid_png', 'composite_png must be a PNG data URL', 400);
 }
 
 $b64 = substr($composite, strpos($composite, ',') + 1);
 $b64 = str_replace(' ', '+', $b64);
 $bin = base64_decode($b64, true);
 if ($bin === false || strlen($bin) < 100) {
-    http_response_code(400);
-    echo json_encode(['ok' => false, 'error' => 'Invalid PNG data']);
-    exit;
+    api_error('invalid_png', 'Invalid PNG data', 400);
 }
 if (strlen($bin) > 12 * 1024 * 1024) {
-    http_response_code(400);
-    echo json_encode(['ok' => false, 'error' => 'Image too large']);
-    exit;
+    api_error('too_large', 'Image too large', 400);
 }
 
-$session = cardy_session_get($sessionId);
+$session = cardy_session_find($sessionId);
+if ($session === null) {
+    api_error('unknown_session', 'Unknown session_id', 404);
+}
+
 $uploadRoot = get_upload_root();
 $userDir = $uploadRoot . '/cards/' . $userId;
 if (!is_dir($userDir)) {
@@ -72,14 +59,21 @@ if (!is_dir($userDir)) {
 $filename = $sessionId . '.png';
 $diskPath = $userDir . '/' . $filename;
 if (file_put_contents($diskPath, $bin) === false) {
-    http_response_code(500);
-    echo json_encode(['ok' => false, 'error' => 'Could not write upload']);
-    exit;
+    api_error('write_failed', 'Could not write upload', 500);
 }
 
-// Public URL served via download-card.php or uploads symlink
 $basePath = get_base_path();
 $imageUrl = $basePath . '/api/download-card.php?card_id=' . rawurlencode($sessionId);
+
+$stats = is_array($data['stats'] ?? null) ? $data['stats'] : ($session['stats'] ?? null);
+if (!is_array($stats)) {
+    $stats = cardobot_generate_stats($session['visual_concept'] ?? []);
+}
+
+$visualConcept = is_array($session['visual_concept'] ?? null) ? $session['visual_concept'] : [];
+if (array_key_exists('show_credit', $data)) {
+    $visualConcept['show_credit'] = !empty($data['show_credit']);
+}
 
 $result = save_finished_card($userId, $sessionId, [
     'image_url' => $imageUrl,
@@ -87,14 +81,17 @@ $result = save_finished_card($userId, $sessionId, [
     'hue' => $hue,
     'saturation' => $sat,
     'lightness' => $light,
-    'visual_concept' => $session['visual_concept'] ?? [],
+    'visual_concept' => $visualConcept,
     'art_url' => $session['art_url'] ?? $session['image_url'] ?? null,
+    'stats' => $stats,
+    'back_variant' => $data['back_variant'] ?? null,
+    'back_hue' => isset($data['back_hue']) ? (int)$data['back_hue'] : null,
+    'back_saturation' => isset($data['back_saturation']) ? (int)$data['back_saturation'] : null,
+    'back_lightness' => isset($data['back_lightness']) ? (int)$data['back_lightness'] : null,
 ]);
 
 if (!$result['success']) {
-    http_response_code(500);
-    echo json_encode(['ok' => false, 'error' => $result['message']]);
-    exit;
+    api_error('save_failed', $result['message'] ?? 'Save failed', 500);
 }
 
 $vc = $session['visual_concept'] ?? [];
@@ -107,9 +104,36 @@ $indexText = trim(implode(' ', array_filter([
 ])));
 ml_index_card((int)$userId, $sessionId, $indexText, $imageUrl);
 
-echo json_encode([
+// Grow ship memory after the response so save stays snappy.
+$vcForStory = $session['visual_concept'] ?? [];
+$statsForStory = is_array($stats) ? $stats : [];
+$uidForStory = (int)$userId;
+$sidForStory = $sessionId;
+register_shutdown_function(static function () use ($vcForStory, $statsForStory, $uidForStory, $sidForStory) {
+    try {
+        require_once __DIR__ . '/../includes/story.php';
+        if (!function_exists('generate_and_update_story_chapter')) {
+            return;
+        }
+        generate_and_update_story_chapter([
+            'card_name' => $vcForStory['nickname'] ?? ($vcForStory['subject'] ?? 'Unknown'),
+            'type_line' => $vcForStory['vibe'] ?? '',
+            'bio' => $vcForStory['bio'] ?? '',
+            'stats' => $statsForStory,
+            'ability_name' => $vcForStory['power_name'] ?? '',
+            'ability_effect' => $vcForStory['ability_line'] ?? '',
+            'height' => $statsForStory['height'] ?? ($vcForStory['height'] ?? ''),
+            'mass' => $statsForStory['mass'] ?? ($vcForStory['mass'] ?? ''),
+        ], $uidForStory, $sidForStory);
+    } catch (Throwable $e) {
+        error_log('export-card story chapter: ' . $e->getMessage());
+    }
+});
+
+api_json([
     'ok' => true,
     'card_id' => $sessionId,
     'image_url' => $imageUrl,
     'message' => 'Saved to your collection.',
+    'stats' => $stats,
 ]);

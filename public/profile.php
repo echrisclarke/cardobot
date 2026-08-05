@@ -108,9 +108,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $activeTab = 'profile';
         }
     } elseif ($action === 'link_google') {
-        if (session_status() === PHP_SESSION_NONE) {
-            session_start();
-        }
+        auth_boot(true);
         $_SESSION['link_google_account'] = true;
         $state = generate_google_state();
         $authUrl = get_google_auth_url($state);
@@ -250,7 +248,14 @@ try {
 
 // Start console wrapper
 console_start('My Collection - Card-o-Bot');
+$assetPath = get_asset_path();
 ?>
+<link rel="stylesheet" href="<?php echo cardobot_asset_url('assets/css/studio.css'); ?>">
+<link rel="stylesheet" href="<?php echo cardobot_asset_url('assets/css/card-viewer.css'); ?>">
+<script src="<?php echo cardobot_asset_url('assets/js/card-layout.js'); ?>"></script>
+<script src="<?php echo cardobot_asset_url('assets/js/drawing-engine.js'); ?>"></script>
+<script src="<?php echo cardobot_asset_url('assets/js/card-studio.js'); ?>"></script>
+<script src="<?php echo cardobot_asset_url('assets/js/card-viewer.js'); ?>"></script>
         <!-- Profile Header -->
         <div class="profile-header card">
             <div class="profile-header-content">
@@ -269,8 +274,7 @@ console_start('My Collection - Card-o-Bot');
                     <?php endif; ?>
                     <p class="profile-stats">
                         <span class="stat-badge"><?php echo $cardCount; ?> Cards</span>
-                        <span class="stat-badge">🤖 <?php echo $botCount; ?> Bots</span>
-                        <span class="stat-badge">🐾 <?php echo $critterCount; ?> Critters</span>
+                        <span class="stat-badge"><?php echo (int)$cardCount; ?> cards</span>
                         <span class="stat-badge">⭐ Collector for <?php echo $accountAgeText; ?></span>
                     </p>
                 </div>
@@ -324,18 +328,56 @@ console_start('My Collection - Card-o-Bot');
                                 $dlUrl = $viewUrl . '&download=1';
                                 $imgSrc = !empty($card['image_url']) ? $card['image_url'] : $viewUrl;
                             ?>
-                                <div class="collection-card" data-card-id="<?php echo htmlspecialchars($cid); ?>">
-                                    <a href="<?php echo htmlspecialchars($viewUrl); ?>" target="_blank" rel="noopener">
+                                <?php
+                                  $attrs = [];
+                                  if (!empty($card['attributes_json'])) {
+                                      $decoded = json_decode($card['attributes_json'], true);
+                                      if (is_array($decoded)) $attrs = $decoded;
+                                  }
+                                  $artUrl = $attrs['art_url'] ?? $viewUrl;
+                                  $payload = [
+                                      'sessionId' => $cid,
+                                      'artUrl' => $artUrl,
+                                      'concept' => [
+                                          'nickname' => $card['nickname'] ?? '',
+                                          'bio' => $card['bio'] ?? '',
+                                          'type' => $card['type'] ?? 'BOT',
+                                          'power_name' => $card['power'] ?? '',
+                                          'ability_line' => $card['ability'] ?? '',
+                                          'subject' => $attrs['subject'] ?? ($card['nickname'] ?? ''),
+                                          'details' => $attrs['details'] ?? '',
+                                          'vibe' => $attrs['vibe'] ?? '',
+                                      ],
+                                      'stats' => [
+                                          'hp' => (int)($card['hp'] ?? 0),
+                                          'npo' => (int)($card['npo'] ?? 0),
+                                          'att' => (int)($card['att'] ?? 0),
+                                          'str' => (int)($card['str'] ?? 0),
+                                          'los' => (int)($card['los'] ?? 0),
+                                          'con' => (int)($card['con'] ?? 0),
+                                      ],
+                                  ];
+                                ?>
+                                <div class="collection-card" data-card-id="<?php echo htmlspecialchars($cid); ?>" data-viewer="<?php echo htmlspecialchars(json_encode($payload), ENT_QUOTES, 'UTF-8'); ?>">
+                                    <button type="button" class="collection-open-viewer" style="all:unset;cursor:pointer;display:block;width:100%;">
                                         <img src="<?php echo htmlspecialchars($imgSrc); ?>" alt="<?php echo htmlspecialchars($card['nickname'] ?? 'Card'); ?>" class="card-image">
-                                    </a>
+                                    </button>
                                     <div class="card-info">
                                         <h4 class="card-nickname"><?php echo htmlspecialchars($card['nickname'] ?? 'Unnamed Card'); ?></h4>
-                                        <p class="card-type"><?php echo htmlspecialchars($card['type'] ?? 'BOT'); ?></p>
+                                        <?php
+                                        $vibeLine = trim((string)($card['vibe'] ?? ''));
+                                        if ($vibeLine === '') {
+                                            $vibeLine = trim((string)($card['subject'] ?? ''));
+                                        }
+                                        if ($vibeLine !== ''):
+                                        ?>
+                                            <p class="card-type"><?php echo htmlspecialchars($vibeLine); ?></p>
+                                        <?php endif; ?>
                                         <?php if (!empty($card['bio'])): ?>
                                             <p class="card-bio"><?php echo htmlspecialchars(substr($card['bio'], 0, 100)) . (strlen($card['bio']) > 100 ? '...' : ''); ?></p>
                                         <?php endif; ?>
                                         <div class="card-actions" style="display:flex;gap:0.4rem;flex-wrap:wrap;margin-top:0.5rem;">
-                                            <a class="btn btn-primary" href="<?php echo htmlspecialchars($viewUrl); ?>" target="_blank" rel="noopener">View</a>
+                                            <button type="button" class="btn btn-primary collection-open-viewer">View</button>
                                             <a class="btn btn-primary" href="<?php echo htmlspecialchars($dlUrl); ?>">Download</a>
                                             <button type="button" class="btn btn-secondary collection-delete" data-card-id="<?php echo htmlspecialchars($cid); ?>">Delete</button>
                                         </div>
@@ -346,6 +388,35 @@ console_start('My Collection - Card-o-Bot');
                         <script>
                         (function() {
                             const base = <?php echo json_encode($basePath); ?>;
+                            const assetBase = <?php echo json_encode($assetPath); ?>;
+                            let viewer = null;
+                            function ensureViewer() {
+                                if (viewer) return viewer;
+                                viewer = new window.CardobotViewer({
+                                    assetBase: assetBase,
+                                    apiBase: base,
+                                    onClose: () => {},
+                                    onSave: null,
+                                });
+                                return viewer;
+                            }
+                            document.querySelectorAll('.collection-open-viewer').forEach((btn) => {
+                                btn.addEventListener('click', async () => {
+                                    const card = btn.closest('.collection-card');
+                                    if (!card) return;
+                                    let payload = {};
+                                    try { payload = JSON.parse(card.getAttribute('data-viewer') || '{}'); } catch (e) {}
+                                    const framed = base + '/api/download-card.php?card_id=' + encodeURIComponent(payload.sessionId || '');
+                                    await ensureViewer().open({
+                                        sessionId: payload.sessionId,
+                                        concept: payload.concept || {},
+                                        stats: payload.stats || {},
+                                        artUrl: payload.artUrl || framed,
+                                        compositeUrl: framed,
+                                        mode: 'viewer',
+                                    });
+                                });
+                            });
                             document.querySelectorAll('.collection-delete').forEach((btn) => {
                                 btn.addEventListener('click', async () => {
                                     const id = btn.getAttribute('data-card-id');
@@ -353,6 +424,7 @@ console_start('My Collection - Card-o-Bot');
                                     try {
                                         const res = await fetch(base + '/api/delete-card.php', {
                                             method: 'POST',
+                                            credentials: 'same-origin',
                                             headers: { 'Content-Type': 'application/json' },
                                             body: JSON.stringify({ card_id: id }),
                                         });
@@ -361,7 +433,7 @@ console_start('My Collection - Card-o-Bot');
                                             const card = btn.closest('.collection-card');
                                             if (card) card.remove();
                                         } else {
-                                            alert('Could not delete card.');
+                                            alert(data.message || 'Could not delete card.');
                                         }
                                     } catch (e) {
                                         alert('Could not delete card.');

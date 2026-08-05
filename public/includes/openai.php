@@ -205,13 +205,19 @@ function openai_extract_usage(array $responseData): ?array {
  */
 function openai_chat_responses(string $input, array $opts = []): array {
     $model = $opts['model'] ?? get_text_model();
-    $maxTokens = (int)($opts['max_output_tokens'] ?? 4000);
+    $maxTokens = (int)($opts['max_output_tokens'] ?? 900);
 
     $payload = [
         'model' => $model,
         'input' => $input,
         'max_output_tokens' => $maxTokens,
     ];
+
+    // Only reasoning models accept reasoning.effort (gpt-5 / o-series).
+    $effort = $opts['reasoning_effort'] ?? (function_exists('get_reasoning_effort') ? get_reasoning_effort() : 'minimal');
+    if (is_string($effort) && $effort !== '' && preg_match('/^(o\d|gpt-5)/i', (string)$model)) {
+        $payload['reasoning'] = ['effort' => $effort];
+    }
 
     if (!empty($opts['schema']) && is_array($opts['schema'])) {
         $name = $opts['schema_name'] ?? 'cardy_response';

@@ -122,7 +122,8 @@ function load_env(): array {
   // 1) Process / Railway environment variables win when present.
   $processKeys = [
     'APP_URL', 'APP_ENV', 'OPENAI_API_KEY', 'OPENAI_TEXT_MODEL', 'OPENAI_IMAGE_MODEL',
-    'OPENAI_MAX_TOKENS', 'OPENAI_TEMPERATURE',
+    'OPENAI_MAX_TOKENS', 'OPENAI_TEMPERATURE', 'OPENAI_REASONING_EFFORT',
+    'XAI_API_KEY', 'GROK_API_KEY', 'XAI_IMAGE_MODEL', 'IMAGE_PROVIDER',
     'CARDOBOT_DB_HOST', 'CARDOBOT_DB_NAME', 'CARDOBOT_DB_USER', 'CARDOBOT_DB_PASS',
     'CARDOBOT_DB_PASSWORD', 'CARDOBOT_DB_CHARSET',
     'DB_HOST', 'DB_NAME', 'DB_USER', 'DB_PASS', 'DB_PASSWORD', 'DB_CHARSET',
@@ -162,9 +163,10 @@ function load_env(): array {
   if (!empty($_ENV['ENV_PATH']) || getenv('ENV_PATH')) {
     $possiblePaths[] = (string)($_ENV['ENV_PATH'] ?? getenv('ENV_PATH'));
   }
-  // Repo root next to public/
+  // Repo root next to public/; sibling private/.env (local monorepo)
   $possiblePaths[] = dirname(__DIR__, 2) . '/.env';
   $possiblePaths[] = dirname(__DIR__) . '/../.env';
+  $possiblePaths[] = dirname(__DIR__, 3) . '/private/.env';
   $possiblePaths[] = dirname($docRoot) . '/.env';
   $possiblePaths[] = dirname($docRoot) . '/private/.env';
   if (strpos($docRoot, '/public_html/') !== false || strpos($docRoot, '\\public_html\\') !== false) {
@@ -226,16 +228,61 @@ function get_upload_root(): string {
   return $dir;
 }
 
-function get_openai_key(): string {
+function get_openai_key(bool $exitOnMissing = true): string {
   $env = load_env();
   $key = $env['OPENAI_API_KEY'] ?? '';
   if (!$key) {
+    if ($exitOnMissing) {
+      if (function_exists('api_error')) {
+        api_error('missing_openai_key', 'OPENAI_API_KEY not configured', 500);
+      }
+      http_response_code(500);
+      header('Content-Type: application/json; charset=utf-8');
+      echo json_encode(['ok' => false, 'error' => 'missing_openai_key', 'message' => 'OPENAI_API_KEY not configured']);
+      exit;
+    }
+    return '';
+  }
+  return $key;
+}
+
+function get_xai_key(bool $exitOnMissing = false): string {
+  $env = load_env();
+  // Prefer XAI_API_KEY; accept shared GROK_API_KEY as alias (credentials guide).
+  $key = trim((string)($env['XAI_API_KEY'] ?? ''));
+  if ($key === '') {
+    $key = trim((string)($env['GROK_API_KEY'] ?? ''));
+  }
+  if ($key === '' && $exitOnMissing) {
+    if (function_exists('api_error')) {
+      api_error('missing_xai_key', 'XAI_API_KEY not configured', 500);
+    }
     http_response_code(500);
     header('Content-Type: application/json; charset=utf-8');
-    echo json_encode(['error' => 'OPENAI_API_KEY not found in .env']);
+    echo json_encode(['ok' => false, 'error' => 'missing_xai_key', 'message' => 'XAI_API_KEY not configured']);
     exit;
   }
   return $key;
+}
+
+function get_image_provider(): string {
+  $env = load_env();
+  $p = strtolower(trim((string)($env['IMAGE_PROVIDER'] ?? 'xai')));
+  return in_array($p, ['xai', 'openai'], true) ? $p : 'xai';
+}
+
+function get_xai_image_model(): string {
+  $env = load_env();
+  return trim((string)($env['XAI_IMAGE_MODEL'] ?? 'grok-imagine-image')) ?: 'grok-imagine-image';
+}
+
+function get_reasoning_effort(): string {
+  $env = load_env();
+  $effort = strtolower(trim((string)($env['OPENAI_REASONING_EFFORT'] ?? 'minimal')));
+  if (!in_array($effort, ['minimal', 'low', 'medium', 'high'], true)) {
+    return 'minimal';
+  }
+  return $effort;
 }
 
 function get_image_model(): string {

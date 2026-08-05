@@ -81,7 +81,29 @@ CREATE TABLE IF NOT EXISTS `cardobot_sessions` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ============================================
--- 4. OPTIONAL EMBEDDING INDEX (ML sidecar may also store vectors on disk)
+-- 4. IMAGE TASKS (durable paint jobs)
+-- ============================================
+CREATE TABLE IF NOT EXISTS `cardobot_image_tasks` (
+  `id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  `task_id` VARCHAR(64) NOT NULL UNIQUE,
+  `user_id` INT UNSIGNED NOT NULL,
+  `session_id` VARCHAR(64) NOT NULL,
+  `status` VARCHAR(32) NOT NULL DEFAULT 'generating',
+  `source` VARCHAR(32) NULL DEFAULT NULL,
+  `prompt` TEXT NULL,
+  `image_url` VARCHAR(500) NULL DEFAULT NULL,
+  `error` TEXT NULL,
+  `visual_json` JSON NULL,
+  `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `completed_at` TIMESTAMP NULL DEFAULT NULL,
+  FOREIGN KEY (`user_id`) REFERENCES `cardobot_users`(`id`) ON DELETE CASCADE,
+  INDEX `idx_task_user` (`user_id`),
+  INDEX `idx_task_session` (`session_id`),
+  INDEX `idx_task_status` (`status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================
+-- 5. OPTIONAL EMBEDDING INDEX (ML sidecar may also store vectors on disk)
 -- ============================================
 CREATE TABLE IF NOT EXISTS `cardobot_card_embeddings` (
   `card_id` VARCHAR(50) NOT NULL PRIMARY KEY,

@@ -11,10 +11,7 @@ $assetPath = get_asset_path();
 $basePath = get_base_path();
 require_once __DIR__ . '/includes/console.php';
 
-// Check if there's a pending Google link in session
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
+auth_boot(true);
 
 $pendingLink = $_SESSION['pending_google_link'] ?? null;
 

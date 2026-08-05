@@ -1,4 +1,7 @@
 <?php
+require_once __DIR__ . '/includes/api.php';
+api_boot();
+api_deny_public_probe();
 /**
  * Test Dashboard - Visual test results page
  * Shows all test results in a user-friendly format
