@@ -74,7 +74,6 @@ if (!empty($session['locale'])) {
     i18n_set_session_locale($loc);
 }
 
-$brandIntro = "Oh. A visitor. I'm Cardy. I run Card-o-Bot aboard this ship: we invent someone together, then I print them onto a trading card. Want to make one with me?";
 $langPickerSuggestions = [
     i18n_t('lang.english', 'en'),
     i18n_t('lang.spanish', 'en'),
@@ -83,7 +82,17 @@ $langPickerSuggestions = [
 ];
 $greetingSuggestions = $langPickerSuggestions;
 
-$cardy_apply_locale = static function (array &$session, string $code, int $userId, bool $changed = false) use (&$loc, &$refreshLocalePack): array {
+$pathChipsFor = static function (string $locale): array {
+    return [
+        i18n_t('path.fast', $locale),
+        i18n_t('path.long', $locale),
+        i18n_t('path.form', $locale),
+        i18n_t('path.chat', $locale),
+        i18n_t('lang.change_chip', $locale),
+    ];
+};
+
+$cardy_apply_locale = static function (array &$session, string $code, int $userId, bool $changed = false) use (&$loc, &$refreshLocalePack, $pathChipsFor): array {
     $nameEn = I18N_PRESET_LOCALES[$code]['name_en'] ?? $code;
     $nameNative = I18N_PRESET_LOCALES[$code]['name_native'] ?? $code;
     $pack = i18n_ensure_locale($code, $nameEn, $nameNative);
@@ -91,6 +100,7 @@ $cardy_apply_locale = static function (array &$session, string $code, int $userI
     $session['locale_picked'] = true;
     $session['awaiting_other_locale'] = false;
     $session['awaiting_locale_confirm'] = false;
+    $session['awaiting_language_switch'] = false;
     i18n_set_session_locale($pack['code']);
     i18n_save_user_locale($userId, $pack['code']);
     $loc = $pack['code'];
@@ -101,18 +111,33 @@ $cardy_apply_locale = static function (array &$session, string $code, int $userI
         : i18n_t('lang.set', $loc);
     return [
         'message' => $message,
-        'suggestions' => [
-            i18n_t('path.fast', $loc),
-            i18n_t('path.long', $loc),
-            i18n_t('path.form', $loc),
-            i18n_t('path.chat', $loc),
-        ],
+        'suggestions' => $pathChipsFor($loc),
     ];
 };
 
-$cardy_soft_confirm_greeting = static function (array &$session, int $userId, ?array $navigatorLanguages) use ($brandIntro, &$loc): array {
+/** Returning user with a saved language: greet fully in that language + easy switch chip. */
+$cardy_preferred_greeting = static function (array &$session, string $code) use (&$loc, &$refreshLocalePack, $pathChipsFor): array {
+    $nameEn = I18N_PRESET_LOCALES[$code]['name_en'] ?? $code;
+    $nameNative = I18N_PRESET_LOCALES[$code]['name_native'] ?? $code;
+    i18n_ensure_locale($code, $nameEn, $nameNative);
+    $session['locale'] = $code;
+    $session['locale_picked'] = true;
+    $session['awaiting_locale_confirm'] = false;
+    $session['awaiting_other_locale'] = false;
+    $session['awaiting_language_switch'] = false;
+    $session['step'] = CARDY_STEP_GREETING;
+    i18n_set_session_locale($code);
+    $loc = $code;
+    $refreshLocalePack = true;
+    return [
+        'message' => i18n_t('chat.greeting', $code),
+        'suggestions' => $pathChipsFor($code),
+    ];
+};
+
+/** First visit / no preferred locale: soft-confirm in one language only. */
+$cardy_soft_confirm_greeting = static function (array &$session, int $userId, ?array $navigatorLanguages) use (&$loc, &$refreshLocalePack): array {
     $candidate = i18n_predict_locale($userId, $navigatorLanguages);
-    // Ensure pack exists so confirm copy can be localized.
     $nameEn = I18N_PRESET_LOCALES[$candidate]['name_en'] ?? $candidate;
     $nameNative = I18N_PRESET_LOCALES[$candidate]['name_native'] ?? $candidate;
     i18n_ensure_locale($candidate, $nameEn, $nameNative);
@@ -123,9 +148,11 @@ $cardy_soft_confirm_greeting = static function (array &$session, int $userId, ?a
     $session['step'] = CARDY_STEP_GREETING;
     i18n_set_session_locale($candidate);
     $loc = $candidate;
+    $refreshLocalePack = true;
     $langName = i18n_locale_native_name($candidate);
     return [
-        'message' => $brandIntro . "\n\n" . i18n_t('lang.confirm', $candidate, ['language' => $langName]),
+        'message' => i18n_t('chat.greeting', $candidate) . "\n\n"
+            . i18n_t('lang.confirm', $candidate, ['language' => $langName]),
         'suggestions' => [
             i18n_t('lang.confirm_yes', $candidate),
             i18n_t('lang.confirm_other', $candidate),
@@ -133,12 +160,14 @@ $cardy_soft_confirm_greeting = static function (array &$session, int $userId, ?a
     ];
 };
 
-$pathSuggestions = [
-    i18n_t('path.fast', $loc),
-    i18n_t('path.long', $loc),
-    i18n_t('path.form', $loc),
-    i18n_t('path.chat', $loc),
-];
+$cardy_boot_greeting = static function (array &$session, int $userId, ?string $prefLocale, ?array $navigatorLanguages) use ($cardy_preferred_greeting, $cardy_soft_confirm_greeting): array {
+    if ($prefLocale) {
+        return $cardy_preferred_greeting($session, $prefLocale);
+    }
+    return $cardy_soft_confirm_greeting($session, $userId, $navigatorLanguages);
+};
+
+$pathSuggestions = $pathChipsFor($loc);
 
 switch ($action) {
     case 'resume':
@@ -146,27 +175,24 @@ switch ($action) {
             $skipModel = true;
             $loc = i18n_normalize_code((string)($session['locale'] ?? $loc)) ?: $loc;
             i18n_set_session_locale($loc);
+            $refreshLocalePack = true;
             $staticMessage = i18n_t('resume.welcome', $loc);
             $staticSuggestions = [
                 i18n_t('resume.continue', $loc),
                 i18n_t('resume.new_card', $loc),
+                i18n_t('lang.change_chip', $loc),
             ];
             // Do not append welcome-back into history until we save below;
             // flag so client can restore prior history separately.
             $session['resume_offered'] = true;
             break;
         }
-        // No resumable session: soft-confirm greeting.
-        $greet = $cardy_soft_confirm_greeting($session, $userId, $navigatorLanguages);
+        // No resumable session: preferred language or soft-confirm (one language only).
+        $greet = $cardy_boot_greeting($session, $userId, $prefLocale, $navigatorLanguages);
         $skipModel = true;
         $staticMessage = $greet['message'];
         $staticSuggestions = $greet['suggestions'];
-        $pathSuggestions = [
-            i18n_t('path.fast', $loc),
-            i18n_t('path.long', $loc),
-            i18n_t('path.form', $loc),
-            i18n_t('path.chat', $loc),
-        ];
+        $pathSuggestions = $pathChipsFor($loc);
         break;
 
     case 'continue_resume':
@@ -186,11 +212,11 @@ switch ($action) {
         $session = cardy_session_create();
         $skipModel = true;
         if ($hadLocale && $keepLocale !== '') {
-            $applied = $cardy_apply_locale($session, $keepLocale, $userId, false);
-            $staticMessage = $brandIntro . "\n\n" . $applied['message'];
-            $staticSuggestions = $applied['suggestions'];
+            $greet = $cardy_preferred_greeting($session, $keepLocale);
+            $staticMessage = $greet['message'];
+            $staticSuggestions = $greet['suggestions'];
         } else {
-            $greet = $cardy_soft_confirm_greeting($session, $userId, $navigatorLanguages);
+            $greet = $cardy_boot_greeting($session, $userId, $prefLocale, $navigatorLanguages);
             $staticMessage = $greet['message'];
             $staticSuggestions = $greet['suggestions'];
         }
@@ -212,9 +238,28 @@ switch ($action) {
         $otherConfirmLabels = [
             mb_strtolower(i18n_t('lang.confirm_other', $loc)),
             mb_strtolower(i18n_t('lang.confirm_other', 'en')),
+            mb_strtolower(i18n_t('lang.change_chip', $loc)),
+            mb_strtolower(i18n_t('lang.change_chip', 'en')),
             'another language', 'another language…', 'another language...',
-            'otro idioma', 'otro idioma…', '换一种语言', '换一种语言…',
+            'change language', 'otro idioma', 'otro idioma…', 'cambiar idioma',
+            '换一种语言', '换一种语言…', '换语言',
         ];
+        // Easy switch from path chips / resume chips (locale already locked).
+        if ($lowVal === 'confirm_other' || $lowVal === 'change_language'
+            || in_array($lowRaw, $otherConfirmLabels, true)
+            || str_contains($lowRaw, 'change language') || str_contains($lowRaw, 'cambiar idioma')
+            || str_contains($lowRaw, '换语言') || str_contains($lowRaw, '换一种语言')) {
+            if (!empty($session['locale_picked']) || !empty($session['awaiting_locale_confirm'])) {
+                $session['awaiting_locale_confirm'] = false;
+                $session['awaiting_language_switch'] = true;
+                $skipModel = true;
+                $staticMessage = i18n_t('lang.change_prompt', $loc);
+                $staticSuggestions = $langPickerSuggestions;
+                $refreshLocalePack = true;
+                $userMessage = '';
+                break;
+            }
+        }
         if (!empty($session['awaiting_locale_confirm'])) {
             if ($lowVal === 'confirm_yes' || in_array($lowRaw, $yesLabels, true) || $lowRaw === 'yes') {
                 $keep = i18n_normalize_code((string)($session['locale'] ?? 'en')) ?: 'en';
@@ -309,17 +354,26 @@ switch ($action) {
             $staticSuggestions = [];
         } else {
             $staticMessage = i18n_t('lang.set', $loc);
-            $staticSuggestions = [
-                i18n_t('path.fast', $loc),
-                i18n_t('path.long', $loc),
-                i18n_t('path.form', $loc),
-                i18n_t('path.chat', $loc),
-            ];
+            $staticSuggestions = $pathChipsFor($loc);
         }
         $userMessage = '';
         break;
 
     case 'select_path':
+        // "Change language" chip sits with path chips; never treat it as a path.
+        $pathMsg = mb_strtolower(trim($userMessage !== '' ? $userMessage : $value));
+        if ($pathMsg === mb_strtolower(i18n_t('lang.change_chip', $loc))
+            || $pathMsg === mb_strtolower(i18n_t('lang.change_chip', 'en'))
+            || $pathMsg === 'change language' || $pathMsg === 'cambiar idioma'
+            || $pathMsg === '换语言' || str_contains($pathMsg, '换一种语言')) {
+            $session['awaiting_language_switch'] = true;
+            $skipModel = true;
+            $staticMessage = i18n_t('lang.change_prompt', $loc);
+            $staticSuggestions = $langPickerSuggestions;
+            $refreshLocalePack = true;
+            $userMessage = '';
+            break;
+        }
         $sel = cardy_select_path_value($value !== '' ? $value : 'fast');
         // Also accept localized path chip text.
         if ($value === '' && $userMessage !== '') {
@@ -467,16 +521,12 @@ switch ($action) {
     case 'greeting':
         $skipModel = true;
         $session['step'] = CARDY_STEP_GREETING;
-        if (!empty($session['locale_picked'])) {
-            $staticMessage = $brandIntro;
-            $staticSuggestions = [
-                i18n_t('path.fast', $loc),
-                i18n_t('path.long', $loc),
-                i18n_t('path.form', $loc),
-                i18n_t('path.chat', $loc),
-            ];
+        if (!empty($session['locale_picked']) && !empty($session['locale'])) {
+            $greet = $cardy_preferred_greeting($session, (string)$session['locale']);
+            $staticMessage = $greet['message'];
+            $staticSuggestions = $greet['suggestions'];
         } else {
-            $greet = $cardy_soft_confirm_greeting($session, $userId, $navigatorLanguages);
+            $greet = $cardy_boot_greeting($session, $userId, $prefLocale, $navigatorLanguages);
             $staticMessage = $greet['message'];
             $staticSuggestions = $greet['suggestions'];
         }
@@ -536,12 +586,7 @@ switch ($action) {
                 $refreshLocalePack = true;
                 $skipModel = true;
                 $staticMessage = i18n_t('lang.set', $loc);
-                $staticSuggestions = [
-                    i18n_t('path.fast', $loc),
-                    i18n_t('path.long', $loc),
-                    i18n_t('path.form', $loc),
-                    i18n_t('path.chat', $loc),
-                ];
+                $staticSuggestions = $pathChipsFor($loc);
                 $userMessage = '';
             }
             break;
@@ -637,12 +682,7 @@ switch ($action) {
                 $loc = $pack['code'];
                 $refreshLocalePack = true;
                 $staticMessage = i18n_t('lang.set', $loc);
-                $staticSuggestions = [
-                    i18n_t('path.fast', $loc),
-                    i18n_t('path.long', $loc),
-                    i18n_t('path.form', $loc),
-                    i18n_t('path.chat', $loc),
-                ];
+                $staticSuggestions = $pathChipsFor($loc);
                 $userMessage = '';
             }
         } elseif ($userMessage !== '' && $session['step'] === CARDY_STEP_GREETING) {
@@ -714,7 +754,7 @@ switch ($action) {
 }
 
 if (!$skipModel && $session['step'] === CARDY_STEP_GREETING && $userMessage === '' && $action === '') {
-    $greet = $cardy_soft_confirm_greeting($session, $userId, $navigatorLanguages);
+    $greet = $cardy_boot_greeting($session, $userId, $prefLocale, $navigatorLanguages);
     $skipModel = true;
     $staticMessage = $greet['message'];
     $staticSuggestions = $greet['suggestions'];

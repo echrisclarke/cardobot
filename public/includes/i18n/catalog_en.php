@@ -3,7 +3,7 @@
  * English UI string catalog (source of truth).
  * Bump I18N_CATALOG_VERSION when keys are added so missing locales fill new keys only.
  */
-const I18N_CATALOG_VERSION = 3;
+const I18N_CATALOG_VERSION = 4;
 
 function i18n_catalog_en(): array {
     return [
@@ -32,6 +32,11 @@ function i18n_catalog_en(): array {
         'chat.placeholder' => 'Type...',
         'chat.continue' => 'Continue',
         'chat.initializing' => 'Initializing connection...',
+        'chat.waiting_cardy' => 'Waiting for Cardy to initialize...',
+        'chat.face_appears' => 'A face appears on the display...',
+        'chat.type_own' => 'Type your own response',
+        'chat.intro_story' => 'You\'ve just docked your ship and stepped aboard a vessel drifting above an unknown world. The corridors are silent, save for the hum of ancient systems. In a dimly lit chamber, you find a matter-compiled device resting on a console. The words "Card-o-Bot" are etched above its screen.',
+        'chat.greeting' => "Oh. A visitor. I'm Cardy. I run Card-o-Bot aboard this ship: we invent someone together, then I print them onto a trading card. Want to make one with me?",
 
         'lang.prompt' => 'Which language should we use on this console?',
         'lang.english' => 'English',
@@ -46,6 +51,7 @@ function i18n_catalog_en(): array {
         'lang.confirm_yes' => 'Yes',
         'lang.confirm_other' => 'Another language…',
         'lang.change_prompt' => 'Which language should we switch to?',
+        'lang.change_chip' => 'Change language',
         'lang.changed' => 'Switched. Console language is now {language}.',
 
         'resume.welcome' => 'Welcome back. Want to pick up where we left off, or start a new card?',

@@ -211,9 +211,9 @@ body.chat-page .chat-messages.show-cardy-bg {
 <div class="chat-messages" id="chatMessages">
     <!-- Stage 1: intro story -->
     <div class="intro-message" id="introMessage">
-        <p>You've just docked your ship and stepped aboard a vessel drifting above an unknown world. The corridors are silent, save for the hum of ancient systems. In a dimly lit chamber, you find a matter-compiled device resting on a console. The words "Card-o-Bot" are etched above its screen.</p>
+        <p data-i18n="chat.intro_story">You've just docked your ship and stepped aboard a vessel drifting above an unknown world. The corridors are silent, save for the hum of ancient systems. In a dimly lit chamber, you find a matter-compiled device resting on a console. The words "Card-o-Bot" are etched above its screen.</p>
         <div class="continue-button-container" id="introContinueBtn">
-            <button type="button" class="continue-button">Continue</button>
+            <button type="button" class="continue-button" data-i18n="chat.continue">Continue</button>
         </div>
     </div>
 
@@ -222,7 +222,7 @@ body.chat-page .chat-messages.show-cardy-bg {
         <div class="loading-bar-container">
             <div class="loading-bar-fill"></div>
         </div>
-        <p class="loading-text">Initializing connection...</p>
+        <p class="loading-text" data-i18n="chat.initializing">Initializing connection...</p>
     </div>
 
     <!-- Subsequent stages (face appearing, Cardy messages, suggestion chips) appended dynamically. -->
@@ -513,6 +513,13 @@ body.chat-page .chat-messages.show-cardy-bg {
             || lower.includes('start a new card') || lower.includes('new card');
     }
 
+    function isChangeLanguageChip(text) {
+        const lower = String(text || '').toLowerCase().trim();
+        const chip = t('lang.change_chip', 'Change language').toLowerCase();
+        return lower === chip || lower === 'change language' || lower === 'cambiar idioma'
+            || lower === '换语言' || lower.includes('换一种语言');
+    }
+
     function navigatorLanguages() {
         try {
             if (Array.isArray(navigator.languages) && navigator.languages.length) {
@@ -698,7 +705,7 @@ body.chat-page .chat-messages.show-cardy-bg {
         const noticeBtn = document.createElement('button');
         noticeBtn.type = 'button';
         noticeBtn.className = 'continue-button';
-        noticeBtn.textContent = 'Continue';
+        noticeBtn.textContent = t('chat.continue', 'Continue');
         noticeBtn.addEventListener('click', proceedFromNotice);
 
         if (!state.greetingReady) {
@@ -707,7 +714,7 @@ body.chat-page .chat-messages.show-cardy-bg {
             noticeBtn.style.cursor = 'not-allowed';
             const waiting = document.createElement('span');
             waiting.className = 'waiting-text';
-            waiting.textContent = 'Waiting for Cardy to initialize...';
+            waiting.textContent = t('chat.waiting_cardy', 'Waiting for Cardy to initialize...');
             noticeBtnContainer.appendChild(waiting);
         }
         noticeBtnContainer.appendChild(noticeBtn);
@@ -729,7 +736,9 @@ body.chat-page .chat-messages.show-cardy-bg {
 
         const faceMsg = document.createElement('div');
         faceMsg.className = 'intro-message face-appearing-message';
-        faceMsg.innerHTML = '<p>A face appears on the display...</p>';
+        const faceP = document.createElement('p');
+        faceP.textContent = t('chat.face_appears', 'A face appears on the display...');
+        faceMsg.appendChild(faceP);
         $chatMessages.appendChild(faceMsg);
         $chatMessages.scrollTop = $chatMessages.scrollHeight;
 
@@ -843,7 +852,7 @@ body.chat-page .chat-messages.show-cardy-bg {
                 const own = document.createElement('button');
                 own.type = 'button';
                 own.className = 'suggestion-button type-own-button';
-                own.textContent = 'Type your own response';
+                own.textContent = t('chat.type_own', 'Type your own response');
                 own.addEventListener('click', () => {
                     $messageInput.focus();
                     $messageInput.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
@@ -1383,12 +1392,23 @@ body.chat-page .chat-messages.show-cardy-bg {
                 handleMakeAnother();
                 return;
             }
+            if (isChangeLanguageChip(text)) {
+                state.resumeOffered = false;
+                appendUserMessage(text);
+                sendChat({ action: 'select_locale', value: 'change_language', user_message: text });
+                return;
+            }
         }
 
         appendUserMessage(text);
 
         const step = state.step;
         const lower = text.toLowerCase();
+
+        if (isChangeLanguageChip(text)) {
+            sendChat({ action: 'select_locale', value: 'change_language', user_message: text });
+            return;
+        }
 
         // "back to english" etc. must never fall into card agenda.
         if (state.localePicked && !state.awaitingLocaleConfirm) {
@@ -1506,6 +1526,10 @@ body.chat-page .chat-messages.show-cardy-bg {
         appendUserMessage(text);
 
         const step = state.step;
+        if (isChangeLanguageChip(text)) {
+            sendChat({ action: 'select_locale', value: 'change_language', user_message: text });
+            return;
+        }
         if (state.localePicked && !state.awaitingLocaleConfirm) {
             const switchTo = languageSwitchTargetFromText(text);
             if (switchTo) {
