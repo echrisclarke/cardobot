@@ -9,6 +9,32 @@
     '#95f5e3', '#f9bbaa', '#ffe5c0', '#7a5cff', '#3d8b40',
   ];
 
+  // Card-o-Bot ink tool glyphs (Herb icons + console SVGs).
+  const INK_ICONS = {
+    brush: 'pen.svg',
+    eraser: 'eraser.svg',
+    hand: 'hand.svg',
+    brushes: 'tip.svg',
+    inkcolor: 'color.svg',
+    hud: 'size.svg',
+    undo: 'undo.png',
+    redo: 'redo.png',
+    zoomout: 'zoom-out.png',
+    zoomin: 'zoom-in.png',
+    resetzoom: 'fit.svg',
+    layers: 'layers.svg',
+    tint: 'tint.svg',
+    flip: 'flip.svg',
+    draw: 'pen.svg',
+    save: 'save.svg',
+    download: 'download.svg',
+    'new-layer': 'new-layer.png',
+    clear: 'clear.svg',
+    trash: 'trash.png',
+    eye: 'eye.svg',
+    'eye-off': 'eye-off.svg',
+  };
+
   class CardViewer {
     constructor(opts) {
       this.assetBase = opts.assetBase || '';
@@ -83,7 +109,10 @@
           <button type="button" class="cob-app-btn" data-act="close-hud">Close</button>
         </div>
         <div class="cob-popover cob-popover-color" data-popover-color>
-          <h3>Ink color</h3>
+          <div class="cob-color-head">
+            <h3>Ink color</h3>
+            <span class="cob-color-chip" data-color-preview style="background:#646464"></span>
+          </div>
           <div class="cob-swatches" data-swatches></div>
           <label class="cob-color-wheel-wrap">
             <span class="cob-hud-label">Custom</span>
@@ -113,15 +142,23 @@
           <div class="cob-brush-grid" data-brush-grid></div>
           <button type="button" class="cob-app-btn" data-act="close-sheet">Close</button>
         </div>
-        <div class="cob-sheet cob-panel" data-sheet-layers>
-          <h3>Layers</h3>
-          <div data-layer-list></div>
-          <div class="cob-layer-row">
-            <button type="button" class="cob-app-btn" data-act="new-layer">New</button>
-            <button type="button" class="cob-app-btn" data-act="clear-layer">Clear</button>
-            <button type="button" class="cob-app-btn" data-act="trash-layers">Trash</button>
+        <div class="cob-sheet cob-panel cob-layers-panel" data-sheet-layers>
+          <div class="cob-layers-head">
+            <h3>Layers</h3>
+            <button type="button" class="cob-icon-act" data-act="close-sheet" title="Close" aria-label="Close">×</button>
           </div>
-          <button type="button" class="cob-app-btn" data-act="close-sheet">Close</button>
+          <div class="cob-layer-list" data-layer-list></div>
+          <div class="cob-layers-toolbar">
+            <button type="button" class="cob-icon-act" data-act="new-layer" title="New layer" aria-label="New layer">
+              <img src="" alt="" data-ink-icon="new-layer">
+            </button>
+            <button type="button" class="cob-icon-act" data-act="clear-layer" title="Clear layer" aria-label="Clear layer">
+              <img src="" alt="" data-ink-icon="clear">
+            </button>
+            <button type="button" class="cob-icon-act danger" data-act="trash-layers" title="Delete all layers" aria-label="Delete all layers">
+              <img src="" alt="" data-ink-icon="trash">
+            </button>
+          </div>
         </div>
         <div class="cob-dock" data-dock></div>
       `;
@@ -148,6 +185,8 @@
 
       this._renderBackPicker();
       this._renderSwatches();
+      this._wireInkIconImgs(this.el);
+      this._setBrushColor(this.brushColor);
 
       this.el.addEventListener('click', (e) => {
         const act = e.target.closest('[data-act]');
@@ -233,10 +272,26 @@
       });
     }
 
+    _inkIcon(key) {
+      const file = INK_ICONS[key] || 'pen.svg';
+      return this.assetBase + '/assets/img/ink-tools/' + file;
+    }
+
+    _wireInkIconImgs(root) {
+      (root || this.el).querySelectorAll('[data-ink-icon]').forEach((img) => {
+        const key = img.getAttribute('data-ink-icon');
+        img.src = this._inkIcon(key);
+        img.decoding = 'async';
+        img.draggable = false;
+      });
+    }
+
     _setBrushColor(color) {
       this.brushColor = color;
       const input = this.el.querySelector('[data-brush-color]');
       if (input) input.value = color;
+      const preview = this.el.querySelector('[data-color-preview]');
+      if (preview) preview.style.background = color;
       const eng = this.studio && this.studio.getEngine();
       if (eng) eng.setColor(color);
     }
@@ -285,12 +340,13 @@
       this._closeSheets();
     }
 
-    _iconBtn(id, glyph, title, tone, needsMenu, showLabel) {
+    _iconBtn(id, title, tone, needsMenu, showLabel) {
       const t = tone || 'teal';
       const menu = needsMenu ? ' cob-tool-has-menu' : '';
       const label = (needsMenu || showLabel) ? ' cob-tool-show-label' : '';
+      const src = this._inkIcon(id === 'draw' ? 'brush' : id);
       return `<button type="button" class="cob-tool-btn cob-tone-${t}${menu}${label}" data-dock="${id}" title="${title}" aria-label="${title}">`
-        + `<span class="ico">${glyph}</span>`
+        + `<img class="ico-img" src="${src}" alt="" draggable="false">`
         + `<span class="cob-tool-caption">${title}</span>`
         + `</button>`;
     }
@@ -301,35 +357,35 @@
       this.el.classList.toggle('is-viewer-mode', !draw);
       this.el.classList.toggle('is-flipped', this.flipped);
 
-      // Press Start tags in Card-o-Bot chip colors. Captions for menu tools.
+      // Icon chips in Card-o-Bot tones; captions only on menu / primary tools.
       if (draw) {
         this.railLeft.innerHTML = [
-          this._iconBtn('brush', 'INK', 'Ink', 'mint', false, true),
-          this._iconBtn('eraser', 'ERS', 'Erase', 'pink', false, true),
-          this._iconBtn('hand', 'HND', 'Hand', 'beige', false, true),
-          this._iconBtn('brushes', 'TIP', 'Tips', 'teal', true),
-          this._iconBtn('inkcolor', 'CLR', 'Color', 'pink', true),
-          this._iconBtn('hud', 'SZ', 'Size', 'mint', true),
-          this._iconBtn('undo', '<<', 'Undo', 'beige'),
-          this._iconBtn('redo', '>>', 'Redo', 'beige'),
-          this._iconBtn('zoomout', 'Z-', 'Out', 'teal'),
-          this._iconBtn('zoomin', 'Z+', 'In', 'teal'),
-          this._iconBtn('resetzoom', '1X', 'Fit', 'mint'),
+          this._iconBtn('brush', 'Ink', 'mint', false, true),
+          this._iconBtn('eraser', 'Erase', 'pink', false, true),
+          this._iconBtn('hand', 'Hand', 'beige', false, true),
+          this._iconBtn('brushes', 'Tips', 'teal', true),
+          this._iconBtn('inkcolor', 'Color', 'pink', true),
+          this._iconBtn('hud', 'Size', 'mint', true),
+          this._iconBtn('undo', 'Undo', 'beige'),
+          this._iconBtn('redo', 'Redo', 'beige'),
+          this._iconBtn('zoomout', 'Out', 'teal'),
+          this._iconBtn('zoomin', 'In', 'teal'),
+          this._iconBtn('resetzoom', 'Fit', 'mint'),
         ].join('');
         this.railRight.innerHTML = [
-          this._iconBtn('layers', 'LYR', 'Layers', 'beige', true),
-          this._iconBtn('tint', 'TNT', 'Tint', 'pink', true),
+          this._iconBtn('layers', 'Layers', 'beige', true),
+          this._iconBtn('tint', 'Tint', 'pink', true),
         ].join('');
         this.dock.innerHTML = '';
       } else {
         this.railLeft.innerHTML = '';
         this.railRight.innerHTML = '';
         this.dock.innerHTML = [
-          this._iconBtn('flip', 'FLP', 'Flip', 'mint'),
-          this._iconBtn('draw', 'DRW', 'Draw', 'teal'),
-          this._iconBtn('tint', 'TNT', 'Tint', 'pink', true),
-          this._iconBtn('save', 'SAV', 'Save', 'beige'),
-          this._iconBtn('download', 'GET', 'Get', 'mint'),
+          this._iconBtn('flip', 'Flip', 'mint'),
+          this._iconBtn('draw', 'Draw', 'teal', false, true),
+          this._iconBtn('tint', 'Tint', 'pink', true),
+          this._iconBtn('save', 'Save', 'beige'),
+          this._iconBtn('download', 'Get', 'mint'),
         ].join('');
       }
 
@@ -340,6 +396,7 @@
           this._dock(btn.getAttribute('data-dock'));
         });
       });
+      this._wireInkIconImgs(this.el);
       this._syncToolActive();
       if (!draw) {
         this.hud.classList.remove('open', 'pinned');
@@ -619,13 +676,32 @@
       const eng = this.studio && this.studio.getEngine();
       list.innerHTML = '';
       if (!eng) return;
-      eng.getLayerList().forEach((l) => {
+      // Top of stack first (Procreate / Photoshop feel).
+      const layers = eng.getLayerList().slice().reverse();
+      layers.forEach((l) => {
         const row = document.createElement('div');
-        row.className = 'cob-layer-row';
-        row.innerHTML = `<button type="button" class="cob-app-btn">${l.name}${l.active ? ' •' : ''}</button>
-          <button type="button" class="cob-app-btn">${l.visible ? 'Hide' : 'Show'}</button>`;
-        row.children[0].addEventListener('click', () => { eng.setActive(l.index); this._renderLayers(); });
-        row.children[1].addEventListener('click', () => { eng.toggleVisibility(l.index); this._renderLayers(); });
+        row.className = 'cob-layer-item' + (l.active ? ' is-active' : '') + (l.visible ? '' : ' is-hidden');
+        const thumb = eng.getLayerThumb ? eng.getLayerThumb(l.index, 44) : '';
+        row.innerHTML = `
+          <button type="button" class="cob-layer-vis" title="${l.visible ? 'Hide' : 'Show'}" aria-label="${l.visible ? 'Hide layer' : 'Show layer'}">
+            <img src="${this._inkIcon(l.visible ? 'eye' : 'eye-off')}" alt="" draggable="false">
+          </button>
+          <button type="button" class="cob-layer-main" title="Select ${l.name}">
+            <span class="cob-layer-thumb">${thumb ? `<img src="${thumb}" alt="">` : ''}</span>
+            <span class="cob-layer-meta">
+              <span class="cob-layer-name">${l.name}</span>
+              <span class="cob-layer-sub">${l.active ? 'Active' : 'Tap to edit'}</span>
+            </span>
+          </button>`;
+        row.querySelector('.cob-layer-main').addEventListener('click', () => {
+          eng.setActive(l.index);
+          this._renderLayers();
+        });
+        row.querySelector('.cob-layer-vis').addEventListener('click', (e) => {
+          e.stopPropagation();
+          eng.toggleVisibility(l.index);
+          this._renderLayers();
+        });
         list.appendChild(row);
       });
     }

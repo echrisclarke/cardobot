@@ -423,6 +423,32 @@
       }));
     }
 
+    getLayerThumb(index, size) {
+      const layer = this.layers[index];
+      if (!layer || !layer.canvas) return '';
+      const dim = Math.max(24, Math.min(96, Number(size) || 48));
+      const c = document.createElement('canvas');
+      c.width = dim;
+      c.height = dim;
+      const ctx = c.getContext('2d');
+      ctx.fillStyle = '#2a3034';
+      ctx.fillRect(0, 0, dim, dim);
+      // Checker so transparent ink reads.
+      for (let y = 0; y < dim; y += 6) {
+        for (let x = 0; x < dim; x += 6) {
+          if (((x + y) / 6) % 2 < 1) {
+            ctx.fillStyle = '#3a4248';
+            ctx.fillRect(x, y, 6, 6);
+          }
+        }
+      }
+      const scale = Math.min(dim / layer.canvas.width, dim / layer.canvas.height);
+      const w = Math.max(1, layer.canvas.width * scale);
+      const h = Math.max(1, layer.canvas.height * scale);
+      ctx.drawImage(layer.canvas, (dim - w) / 2, (dim - h) / 2, w, h);
+      return c.toDataURL('image/png');
+    }
+
     exportLayersJson() {
       return {
         version: 2,

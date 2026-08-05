@@ -315,6 +315,15 @@
   pointer-events: none;
 }
 
+.cob-tool-btn .ico-img {
+  width: 1.25rem;
+  height: 1.25rem;
+  object-fit: contain;
+  pointer-events: none;
+  display: block;
+  image-rendering: auto;
+}
+
 .cob-tool-btn .cob-tool-caption {
   display: none;
   font-size: 0.28rem;
@@ -469,15 +478,42 @@
   gap: 0.55rem;
   width: min(92%, 16rem);
   padding: 0.7rem 0.75rem;
-  background: rgba(16, 18, 20, 0.97);
-  border: 2px solid rgba(224, 126, 140, 0.65);
+  background:
+    linear-gradient(180deg, rgba(36, 48, 52, 0.35), rgba(16, 18, 20, 0.2)),
+    rgba(18, 20, 22, 0.97);
+  border: 2px solid rgba(149, 245, 227, 0.55);
   border-radius: 0.55rem;
-  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.55);
+  box-shadow:
+    0 10px 28px rgba(0, 0, 0, 0.55),
+    inset 0 0 0 1px rgba(87, 189, 206, 0.18);
   pointer-events: auto;
 }
 
 .cob-popover.open {
   display: flex;
+}
+
+.cob-popover-color {
+  border-color: rgba(224, 126, 140, 0.65);
+  box-shadow:
+    0 10px 28px rgba(0, 0, 0, 0.55),
+    inset 0 0 0 1px rgba(224, 126, 140, 0.2);
+}
+
+.cob-color-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.cob-color-chip {
+  width: 1.35rem;
+  height: 1.35rem;
+  border-radius: 0.3rem;
+  border: 2px solid rgba(255, 255, 255, 0.55);
+  box-shadow: inset 0 -2px 0 rgba(0, 0, 0, 0.25);
+  flex-shrink: 0;
 }
 
 .cob-popover h3,
@@ -493,31 +529,50 @@
 .cob-swatches {
   display: grid;
   grid-template-columns: repeat(5, 1fr);
-  gap: 0.3rem;
+  gap: 0.35rem;
+  padding: 0.35rem;
+  background: rgba(10, 12, 14, 0.55);
+  border: 1px solid rgba(87, 189, 206, 0.28);
+  border-radius: 0.4rem;
 }
 
 .cob-swatch {
   width: 100%;
   aspect-ratio: 1;
   border-radius: 0.3rem;
-  border: 2px solid rgba(255, 255, 255, 0.45);
+  border: 2px solid rgba(255, 255, 255, 0.4);
   cursor: pointer;
   padding: 0;
   min-height: 1.6rem;
+  box-shadow: inset 0 -2px 0 rgba(0, 0, 0, 0.28);
 }
 
 .cob-swatch:hover,
 .cob-swatch:focus {
   border-color: rgb(149, 245, 227);
   outline: none;
+  transform: translateY(-1px);
+}
+
+.cob-color-wheel-wrap {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.45rem;
+  align-items: center;
+  padding: 0.35rem 0.4rem;
+  background: rgba(10, 12, 14, 0.45);
+  border: 1px solid rgba(224, 126, 140, 0.35);
+  border-radius: 0.4rem;
 }
 
 .cob-color-wheel-wrap input[type="color"] {
   width: 100%;
   height: 2.2rem;
-  border: none;
-  background: transparent;
+  border: 2px solid rgba(255, 229, 192, 0.45);
+  border-radius: 0.35rem;
+  background: rgba(40, 40, 40, 0.9);
   cursor: pointer;
+  padding: 0.15rem;
 }
 
 .cob-sheet,
@@ -634,6 +689,193 @@
 
 .cob-layer-row .cob-app-btn {
   flex: 1 1 auto;
+}
+
+/* Procreate / Photoshop-style layers stack */
+.cob-layers-panel {
+  display: none;
+  flex-direction: column;
+  max-height: 68%;
+  padding: 0;
+  overflow: hidden;
+  border-color: rgba(149, 245, 227, 0.5);
+  background: rgba(14, 16, 18, 0.98);
+}
+
+.cob-layers-panel.open {
+  display: flex;
+}
+
+.cob-layers-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.65rem 0.7rem 0.5rem;
+  border-bottom: 1px solid rgba(87, 189, 206, 0.28);
+  background: rgba(24, 28, 32, 0.95);
+}
+
+.cob-layers-head h3 {
+  margin: 0;
+}
+
+.cob-layer-list {
+  flex: 1 1 auto;
+  overflow: auto;
+  padding: 0.35rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.28rem;
+  min-height: 8rem;
+}
+
+.cob-layer-item {
+  display: grid;
+  grid-template-columns: 2.2rem 1fr;
+  gap: 0.3rem;
+  align-items: stretch;
+  padding: 0.28rem;
+  border-radius: 0.4rem;
+  border: 1px solid rgba(87, 189, 206, 0.22);
+  background: rgba(28, 34, 38, 0.92);
+}
+
+.cob-layer-item.is-active {
+  border-color: rgba(149, 245, 227, 0.75);
+  background: rgba(149, 245, 227, 0.14);
+  box-shadow: inset 0 0 0 1px rgba(149, 245, 227, 0.2);
+}
+
+.cob-layer-item.is-hidden {
+  opacity: 0.55;
+}
+
+.cob-layer-vis,
+.cob-layer-main,
+.cob-icon-act {
+  appearance: none;
+  border: none;
+  background: transparent;
+  color: rgb(230, 248, 252);
+  cursor: pointer;
+  padding: 0;
+}
+
+.cob-layer-vis {
+  display: grid;
+  place-items: center;
+  border-radius: 0.3rem;
+  background: rgba(10, 12, 14, 0.55);
+  border: 1px solid rgba(87, 189, 206, 0.25);
+}
+
+.cob-layer-vis img,
+.cob-icon-act img {
+  width: 1.05rem;
+  height: 1.05rem;
+  object-fit: contain;
+  display: block;
+}
+
+.cob-layer-main {
+  display: grid;
+  grid-template-columns: 2.6rem 1fr;
+  gap: 0.45rem;
+  align-items: center;
+  text-align: left;
+  padding: 0.15rem 0.25rem 0.15rem 0.1rem;
+  min-height: 2.7rem;
+}
+
+.cob-layer-thumb {
+  width: 2.6rem;
+  height: 2.6rem;
+  border-radius: 0.28rem;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background:
+    linear-gradient(45deg, #3a4248 25%, transparent 25%) 0 0 / 8px 8px,
+    linear-gradient(-45deg, #3a4248 25%, transparent 25%) 0 4px / 8px 8px,
+    #2a3034;
+  overflow: hidden;
+}
+
+.cob-layer-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  image-rendering: auto;
+}
+
+.cob-layer-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+.cob-layer-name {
+  font-family: var(--font-family-retro, "Press Start 2P", monospace) !important;
+  font-size: 0.42rem;
+  color: rgb(230, 248, 252);
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cob-layer-sub {
+  font-size: 0.68rem;
+  color: rgba(179, 236, 250, 0.65);
+}
+
+.cob-layers-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.45rem 0.55rem 0.55rem;
+  border-top: 1px solid rgba(87, 189, 206, 0.28);
+  background: rgba(24, 28, 32, 0.95);
+}
+
+.cob-icon-act {
+  width: 2.35rem;
+  height: 2.35rem;
+  display: grid;
+  place-items: center;
+  border-radius: 0.35rem;
+  border: 2px solid rgba(87, 189, 206, 0.4);
+  background: rgba(149, 245, 227, 0.14);
+}
+
+.cob-icon-act:hover {
+  border-color: rgba(149, 245, 227, 0.75);
+  background: rgba(149, 245, 227, 0.24);
+}
+
+.cob-icon-act.danger {
+  border-color: rgba(224, 126, 140, 0.55);
+  background: rgba(224, 126, 140, 0.18);
+}
+
+.cob-icon-act.danger:hover {
+  border-color: rgba(224, 126, 140, 0.85);
+  background: rgba(224, 126, 140, 0.3);
+}
+
+/* Essential PNG glyphs are dark; invert them on the dark layers toolbar. */
+.cob-layers-toolbar .cob-icon-act img[src$=".png"] {
+  filter: invert(0.92) brightness(1.05);
+}
+
+.cob-layers-head .cob-icon-act {
+  width: 1.9rem;
+  height: 1.9rem;
+  font-size: 1rem;
+  line-height: 1;
+  color: rgb(149, 245, 227);
+  border-color: rgba(87, 189, 206, 0.35);
 }
 
 body.cob-app-open {
