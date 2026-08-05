@@ -68,49 +68,60 @@
               </div>
             </div>
           </div>
-          <div class="cob-hud" data-hud>
-            <label>Size <input type="range" min="1" max="48" value="8" data-brush-size><span data-size-val>8</span></label>
-            <label>Opacity <input type="range" min="5" max="100" value="100" data-brush-opacity><span data-opacity-val>100%</span></label>
+        </div>
+        <div class="cob-hud" data-hud>
+          <div class="cob-hud-row">
+            <span class="cob-hud-label">SIZE</span>
+            <input type="range" min="1" max="48" value="8" data-brush-size>
+            <span class="cob-hud-val" data-size-val>8</span>
           </div>
-          <div class="cob-popover cob-popover-color" data-popover-color>
-            <div class="cob-swatches" data-swatches></div>
-            <label class="cob-color-wheel-wrap">
-              <input type="color" value="#646464" data-brush-color>
-            </label>
-            <button type="button" class="cob-app-btn" data-act="close-popovers">Close</button>
+          <div class="cob-hud-row">
+            <span class="cob-hud-label">OPACITY</span>
+            <input type="range" min="5" max="100" value="100" data-brush-opacity>
+            <span class="cob-hud-val" data-opacity-val>100%</span>
           </div>
-          <div class="cob-sheet cob-panel" data-sheet-color>
-            <h3>Card tint</h3>
-            <label>Face
-              <select data-color-face>
-                <option value="front">Front</option>
-                <option value="back">Back</option>
-              </select>
-            </label>
-            <label>Hue <input type="range" min="0" max="360" value="195" data-hue></label>
-            <label>Sat <input type="range" min="0" max="100" value="65" data-sat></label>
-            <label>Light <input type="range" min="0" max="100" value="40" data-light></label>
-            <label class="cob-check">
-              <input type="checkbox" data-show-credit checked>
-              Show username on card
-            </label>
-            <button type="button" class="cob-app-btn" data-act="close-sheet">Close</button>
+          <button type="button" class="cob-app-btn" data-act="close-hud">Close</button>
+        </div>
+        <div class="cob-popover cob-popover-color" data-popover-color>
+          <h3>Ink color</h3>
+          <div class="cob-swatches" data-swatches></div>
+          <label class="cob-color-wheel-wrap">
+            <span class="cob-hud-label">Custom</span>
+            <input type="color" value="#646464" data-brush-color>
+          </label>
+          <button type="button" class="cob-app-btn" data-act="close-popovers">Close</button>
+        </div>
+        <div class="cob-sheet cob-panel" data-sheet-color>
+          <h3>Card tint</h3>
+          <label>Face
+            <select data-color-face>
+              <option value="front">Front</option>
+              <option value="back">Back</option>
+            </select>
+          </label>
+          <label>Hue <input type="range" min="0" max="360" value="195" data-hue></label>
+          <label>Sat <input type="range" min="0" max="100" value="65" data-sat></label>
+          <label>Light <input type="range" min="0" max="100" value="40" data-light></label>
+          <label class="cob-check">
+            <input type="checkbox" data-show-credit checked>
+            Show username on card
+          </label>
+          <button type="button" class="cob-app-btn" data-act="close-sheet">Close</button>
+        </div>
+        <div class="cob-sheet cob-panel" data-sheet-brushes>
+          <h3>Brush tips</h3>
+          <div class="cob-brush-grid" data-brush-grid></div>
+          <button type="button" class="cob-app-btn" data-act="close-sheet">Close</button>
+        </div>
+        <div class="cob-sheet cob-panel" data-sheet-layers>
+          <h3>Layers</h3>
+          <div data-layer-list></div>
+          <div class="cob-layer-row">
+            <button type="button" class="cob-app-btn" data-act="new-layer">New</button>
+            <button type="button" class="cob-app-btn" data-act="clear-layer">Clear</button>
+            <button type="button" class="cob-app-btn" data-act="trash-layers">Trash</button>
           </div>
-          <div class="cob-sheet cob-panel" data-sheet-brushes>
-            <h3>Tips</h3>
-            <div class="cob-brush-grid" data-brush-grid></div>
-            <button type="button" class="cob-app-btn" data-act="close-sheet">Close</button>
-          </div>
-          <div class="cob-sheet cob-panel" data-sheet-layers>
-            <h3>Layers</h3>
-            <div data-layer-list></div>
-            <div class="cob-layer-row">
-              <button type="button" class="cob-app-btn" data-act="new-layer">New</button>
-              <button type="button" class="cob-app-btn" data-act="clear-layer">Clear</button>
-              <button type="button" class="cob-app-btn" data-act="trash-layers">Trash</button>
-            </div>
-            <button type="button" class="cob-app-btn" data-act="close-sheet">Close</button>
-          </div>
+          <button type="button" class="cob-app-btn" data-act="close-sheet">Close</button>
         </div>
         <div class="cob-dock" data-dock></div>
       `;
@@ -274,9 +285,13 @@
       this._closeSheets();
     }
 
-    _iconBtn(id, glyph, title, tone) {
+    _iconBtn(id, glyph, title, tone, needsMenu) {
       const t = tone || 'teal';
-      return `<button type="button" class="cob-tool-btn cob-tone-${t}" data-dock="${id}" title="${title}" aria-label="${title}"><span class="ico">${glyph}</span></button>`;
+      const menu = needsMenu ? ' cob-tool-has-menu' : '';
+      return `<button type="button" class="cob-tool-btn cob-tone-${t}${menu}" data-dock="${id}" title="${title}" aria-label="${title}">`
+        + `<span class="ico">${glyph}</span>`
+        + `<span class="cob-tool-caption">${title}</span>`
+        + `</button>`;
     }
 
     _renderChrome() {
@@ -285,24 +300,24 @@
       this.el.classList.toggle('is-viewer-mode', !draw);
       this.el.classList.toggle('is-flipped', this.flipped);
 
-      // Press Start glyphs (short tags) in Card-o-Bot chip colors. No emoji.
+      // Press Start tags in Card-o-Bot chip colors. Captions for menu tools.
       if (draw) {
         this.railLeft.innerHTML = [
-          this._iconBtn('brush', 'INK', 'Brush', 'mint'),
-          this._iconBtn('eraser', 'ERS', 'Eraser', 'pink'),
+          this._iconBtn('brush', 'INK', 'Ink', 'mint'),
+          this._iconBtn('eraser', 'ERS', 'Erase', 'pink'),
           this._iconBtn('hand', 'HND', 'Hand', 'beige'),
-          this._iconBtn('brushes', 'TIP', 'Tips', 'teal'),
-          this._iconBtn('inkcolor', 'CLR', 'Ink color', 'pink'),
-          this._iconBtn('hud', 'SZ', 'Size / opacity', 'mint'),
+          this._iconBtn('brushes', 'TIP', 'Tips', 'teal', true),
+          this._iconBtn('inkcolor', 'CLR', 'Color', 'pink', true),
+          this._iconBtn('hud', 'SZ', 'Size', 'mint', true),
           this._iconBtn('undo', '<<', 'Undo', 'beige'),
           this._iconBtn('redo', '>>', 'Redo', 'beige'),
-          this._iconBtn('zoomout', 'Z-', 'Zoom out', 'teal'),
-          this._iconBtn('zoomin', 'Z+', 'Zoom in', 'teal'),
+          this._iconBtn('zoomout', 'Z-', 'Out', 'teal'),
+          this._iconBtn('zoomin', 'Z+', 'In', 'teal'),
           this._iconBtn('resetzoom', '1X', 'Fit', 'mint'),
         ].join('');
         this.railRight.innerHTML = [
-          this._iconBtn('layers', 'LYR', 'Layers', 'beige'),
-          this._iconBtn('tint', 'TNT', 'Card tint', 'pink'),
+          this._iconBtn('layers', 'LYR', 'Layers', 'beige', true),
+          this._iconBtn('tint', 'TNT', 'Tint', 'pink', true),
         ].join('');
         this.dock.innerHTML = '';
       } else {
@@ -311,28 +326,34 @@
         this.dock.innerHTML = [
           this._iconBtn('flip', 'FLP', 'Flip', 'mint'),
           this._iconBtn('draw', 'DRW', 'Draw', 'teal'),
-          this._iconBtn('tint', 'TNT', 'Card tint', 'pink'),
+          this._iconBtn('tint', 'TNT', 'Tint', 'pink', true),
           this._iconBtn('save', 'SAV', 'Save', 'beige'),
-          this._iconBtn('download', 'GET', 'Download', 'mint'),
+          this._iconBtn('download', 'GET', 'Get', 'mint'),
         ].join('');
       }
 
       this.el.querySelectorAll('[data-dock]').forEach((btn) => {
-        btn.addEventListener('click', () => this._dock(btn.getAttribute('data-dock')));
+        btn.addEventListener('click', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          this._dock(btn.getAttribute('data-dock'));
+        });
       });
       this._syncToolActive();
-      this.hud.classList.toggle('open', draw && this.hud.classList.contains('pinned'));
+      if (!draw) {
+        this.hud.classList.remove('open', 'pinned');
+        this._closeSheets();
+        this._closePopovers();
+      }
     }
 
     _syncToolActive() {
       this.el.querySelectorAll('[data-dock]').forEach((btn) => {
         const id = btn.getAttribute('data-dock');
-        const on = (id === this.activeTool)
-          || (id === 'brush' && this.activeTool === 'brush')
-          || (id === 'eraser' && this.activeTool === 'eraser')
-          || (id === 'hand' && this.activeTool === 'hand');
+        const on = id === this.activeTool;
         btn.classList.toggle('active', on && (id === 'brush' || id === 'eraser' || id === 'hand'));
       });
+      this.viewport.classList.toggle('is-panning', this.mode === 'draw' && this.activeTool === 'hand');
     }
 
     async open(payload) {
@@ -473,6 +494,10 @@
         this._closePopovers();
         return;
       }
+      if (act === 'close-hud') {
+        this.hud.classList.remove('open', 'pinned');
+        return;
+      }
       if (act === 'new-layer') {
         const eng = this.studio && this.studio.getEngine();
         if (eng) { eng.addLayer(); this._renderLayers(); }
@@ -504,43 +529,57 @@
         return;
       }
       if (id === 'color' || id === 'tint') {
+        this.hud.classList.remove('open', 'pinned');
+        this._closePopovers();
         this._openSheet(this.sheetColor);
         return;
       }
       if (id === 'brushes') {
+        this.hud.classList.remove('open', 'pinned');
+        this._closePopovers();
+        this._renderBrushGrid();
         this._openSheet(this.sheetBrushes);
         return;
       }
       if (id === 'layers') {
+        this.hud.classList.remove('open', 'pinned');
+        this._closePopovers();
         this._renderLayers();
         this._openSheet(this.sheetLayers);
         return;
       }
       if (id === 'inkcolor') {
+        this.hud.classList.remove('open', 'pinned');
+        this._closeSheets();
         this.popoverColor.classList.toggle('open');
         return;
       }
       if (id === 'hud') {
-        this.hud.classList.toggle('pinned');
-        this.hud.classList.toggle('open', this.hud.classList.contains('pinned'));
+        this._closeSheets();
+        this._closePopovers();
+        const on = !this.hud.classList.contains('open');
+        this.hud.classList.toggle('pinned', on);
+        this.hud.classList.toggle('open', on);
         return;
       }
-      if (id === 'brush' && eng) {
+      if (id === 'brush') {
         this.activeTool = 'brush';
-        eng.setTool('brush');
+        if (eng) eng.setTool('brush');
         this._syncToolActive();
         return;
       }
-      if (id === 'eraser' && eng) {
+      if (id === 'eraser') {
         this.activeTool = 'eraser';
-        eng.setTool('eraser');
+        if (eng) eng.setTool('eraser');
         this._syncToolActive();
         return;
       }
-      if (id === 'hand' && eng) {
+      if (id === 'hand') {
         this.activeTool = 'hand';
-        eng.setTool('hand');
+        if (eng) eng.setTool('hand');
+        this._wireEnginePan();
         this._syncToolActive();
+        this.viewport.classList.add('is-panning');
         return;
       }
       if (id === 'undo' && eng) { eng.undo(); return; }
@@ -559,17 +598,19 @@
     }
 
     _openSheet(sheet) {
+      if (!sheet) return;
       this._closeSheets();
-      this._closePopovers();
       sheet.classList.add('open');
     }
 
     _closeSheets() {
-      [this.sheetColor, this.sheetBrushes, this.sheetLayers].forEach((s) => s.classList.remove('open'));
+      [this.sheetColor, this.sheetBrushes, this.sheetLayers].forEach((s) => {
+        if (s) s.classList.remove('open');
+      });
     }
 
     _closePopovers() {
-      this.popoverColor.classList.remove('open');
+      if (this.popoverColor) this.popoverColor.classList.remove('open');
     }
 
     _renderLayers() {
@@ -673,24 +714,46 @@
         `translate(${this.pan.x}px, ${this.pan.y}px) scale(${this.scale}) rotateX(${tiltX}deg) rotateY(${tiltY}deg)`;
     }
 
+    _isUiChrome(target) {
+      if (!target || !target.closest) return false;
+      return !!(
+        target.closest('.cob-rail')
+        || target.closest('.cob-dock')
+        || target.closest('.cob-hud')
+        || target.closest('.cob-popover')
+        || target.closest('.cob-sheet')
+        || target.closest('.cob-panel')
+        || target.closest('.cob-app-bar')
+        || target.closest('.cob-back-picker')
+        || target.closest('[data-dock]')
+        || target.closest('[data-act]')
+      );
+    }
+
     _bindGestures() {
       let dragging = false;
       let last = null;
       let pinchStart = null;
       const stage = this.el.querySelector('.cob-stage');
 
-      // Capture phase so pinch works even when the drawing stage stops propagation.
+      // Capture phase so pinch works over ink; never steal tool/panel clicks.
       const onDown = (e) => {
+        if (this._isUiChrome(e.target)) return;
         this._pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
         const onInk = !!(e.target.closest && e.target.closest('.drawing-stage'));
         const panMode = this.activeTool === 'hand' || this._spaceDown;
-        if (this.mode === 'draw' && onInk && !panMode) {
-          // Let the engine paint; still track pointers for pinch.
+        // Ink / hand-on-ink: drawing engine owns the pointer (paint or pan).
+        if (this.mode === 'draw' && onInk) {
           if (this._pointers.size >= 2) {
             const eng = this.studio && this.studio.getEngine();
             if (eng) eng.drawing = false;
+          } else {
+            return;
           }
-          return;
+        }
+        if (this.mode === 'draw' && !panMode && !onInk) {
+          // Empty stage chrome around the card: ignore single-finger draw-mode drag.
+          if (this._pointers.size < 2) return;
         }
         try { this.viewport.setPointerCapture(e.pointerId); } catch (_) { /* */ }
         if (this._pointers.size === 1) {
@@ -723,13 +786,14 @@
         const dx = e.clientX - last.x;
         const dy = e.clientY - last.y;
         last = { x: e.clientX, y: e.clientY };
-        if (this.mode === 'draw' || this.activeTool === 'hand' || this._spaceDown) {
+        // Pan only with hand tool or space-hold (not every draw-mode drag).
+        if (this.activeTool === 'hand' || this._spaceDown) {
           this.pan.x += dx;
           this.pan.y += dy;
           this._applyTransform();
           return;
         }
-        if (!this._reduced) {
+        if (this.mode !== 'draw' && !this._reduced) {
           this.tilt.y = Math.max(-12, Math.min(12, this.tilt.y + dx * 0.08));
           this.tilt.x = Math.max(-10, Math.min(10, this.tilt.x - dy * 0.08));
           this._applyTransform();

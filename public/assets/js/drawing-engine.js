@@ -287,7 +287,7 @@
         if (!this._enabled) return;
         if (e.pointerType === 'touch' && e.isPrimary === false) return;
         if (this._isPanTool()) {
-          e.stopPropagation();
+          // Do not stopPropagation: viewer also needs the pointer for pinch/zoom.
           if (e.cancelable) e.preventDefault();
           try { this.stage.setPointerCapture(e.pointerId); } catch (_) { /* */ }
           this.drawing = false;
