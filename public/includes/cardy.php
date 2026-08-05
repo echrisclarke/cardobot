@@ -26,6 +26,7 @@ const CARDY_STEP_FREE_CHAT     = 'free_chat';
 const CARDY_PATH_FAST = 'fast';
 const CARDY_PATH_LONG = 'long';
 const CARDY_PATH_CHAT = 'chat';
+const CARDY_PATH_FORM = 'form';
 
 // Legacy aliases
 const CARDY_STEP_CHOOSE_MODE = CARDY_STEP_CHOOSE_INTENT;
@@ -80,10 +81,14 @@ function cardy_is_path_intent_message(string $text): bool {
         'help me remember someone', 'remember someone', 'just talk a bit', 'just talk',
         'just chat for now', 'just chat', 'yeah, make a card', 'yeah make a card',
         'make a detailed one', 'make a detailed card',
+        'fill out a form', 'fill in a form', 'use a form', 'form instead',
         "let's make one!", "yes, let's make one!", 'yes lets make one',
         'tell me more first', 'make a card', "let's make a card", 'make one together',
     ];
     if (in_array($low, $exact, true)) {
+        return true;
+    }
+    if (preg_match('/\b(fill|use)\b.*\bform\b/', $low) && mb_strlen($low) < 48) {
         return true;
     }
     // Short intent lines that are clearly menu choices
@@ -296,7 +301,7 @@ function cardy_missing_slots(array $concept, string $path): array {
             $missing[] = 'place';
         }
     } else {
-        // fast (default print)
+        // fast + form (default print fields)
         if (!cardy_slot_filled_look($concept)) {
             $missing[] = 'look';
         }
@@ -310,7 +315,7 @@ function cardy_slots_complete(array $concept, string $path): bool {
 
 function cardy_session_path(array $session): string {
     $path = $session['path'] ?? null;
-    if (is_string($path) && in_array($path, [CARDY_PATH_FAST, CARDY_PATH_LONG, CARDY_PATH_CHAT], true)) {
+    if (is_string($path) && in_array($path, [CARDY_PATH_FAST, CARDY_PATH_LONG, CARDY_PATH_CHAT, CARDY_PATH_FORM], true)) {
         return $path;
     }
     if (($session['mode'] ?? null) === CARDY_MODE_FREECHAT) {

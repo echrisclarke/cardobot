@@ -201,6 +201,48 @@
   margin-top: 0.2rem;
 }
 
+.confirm-hint {
+  font-size: 0.8rem;
+  opacity: 0.85;
+  margin: 0 0 0.5rem;
+}
+
+.confirm-optional {
+  opacity: 0.65;
+  font-weight: 400;
+}
+
+.confirm-form-extra[hidden] {
+  display: none !important;
+}
+
+.confirm-kind-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: 0.35rem;
+}
+
+.confirm-kind-chips .confirm-kind-chip {
+  font-size: 0.78rem;
+  padding: 0.28rem 0.65rem;
+}
+
+.confirm-kind-chips .confirm-kind-chip.is-selected {
+  outline: 1px solid rgba(149, 245, 227, 0.7);
+  background: rgba(149, 245, 227, 0.12);
+}
+
+.confirm-form-error {
+  color: #ff8a8a;
+  font-size: 0.78rem;
+  margin: 0.4rem 0 0;
+}
+
+.confirm-form-error[hidden] {
+  display: none !important;
+}
+
 .confirm-nick-chips {
   display: flex;
   flex-wrap: wrap;

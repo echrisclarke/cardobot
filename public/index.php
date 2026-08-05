@@ -233,14 +233,32 @@ body.chat-page .chat-messages.show-cardy-bg {
 </div>
 
 <div class="confirm-panel" id="confirmPanel">
-    <p><strong>Your card so far</strong></p>
-    <p class="confirm-hint" style="font-size:0.8rem;opacity:0.85;margin:0 0 0.5rem;">Tweak anything, then paint.</p>
+    <p id="confirmPanelTitle"><strong>Your card so far</strong></p>
+    <p class="confirm-hint" id="confirmHint">Tweak anything, then paint.</p>
+    <div class="confirm-form-extra" id="confirmFormExtra" hidden>
+      <label>Kind
+        <div class="confirm-kind-chips" id="confirmKindChips" aria-label="Card kind"></div>
+        <input type="hidden" id="confirmType" value="">
+      </label>
+      <label>Who / what are they?
+        <input type="text" id="confirmSubject" maxlength="120" placeholder="e.g. rusty dock crane bot">
+      </label>
+    </div>
     <label>Nickname
-      <input type="text" id="confirmNickname" maxlength="22" placeholder="Type your own callsign">
+      <input type="text" id="confirmNickname" maxlength="16" placeholder="Type your own callsign">
     </label>
     <div class="confirm-nick-chips" id="confirmNickChips" aria-label="Suggested names from Cardy"></div>
-    <label>Vibe <input type="text" id="confirmVibe" maxlength="120"></label>
-    <label>Details <textarea id="confirmDetails" rows="2" maxlength="500"></textarea></label>
+    <label>Vibe <input type="text" id="confirmVibe" maxlength="120" placeholder="mood or energy"></label>
+    <label>Details / look <textarea id="confirmDetails" rows="2" maxlength="500" placeholder="what they look like"></textarea></label>
+    <div class="confirm-form-extra" id="confirmFormExtraMore" hidden>
+      <label>Setting <span class="confirm-optional">(optional)</span>
+        <input type="text" id="confirmSetting" maxlength="160" placeholder="where they are">
+      </label>
+      <label>Stake <span class="confirm-optional">(optional)</span>
+        <input type="text" id="confirmStake" maxlength="160" placeholder="what matters to them">
+      </label>
+    </div>
+    <p class="confirm-form-error" id="confirmFormError" hidden></p>
     <div class="reveal-actions">
         <button type="button" id="confirmPaintBtn">Paint it!</button>
         <button type="button" class="secondary" id="confirmUpdateBtn">Update</button>
@@ -754,13 +772,113 @@ body.chat-page .chat-messages.show-cardy-bg {
         openCardApp('viewer');
     }
 
+    function isFormPath() {
+        return state.path === 'form';
+    }
+
     function fillConfirmPanel(concept, nickSuggestions) {
         lastConcept = concept || {};
-        document.getElementById('confirmNickname').value = lastConcept.nickname || lastConcept.subject || '';
+        const formMode = isFormPath();
+        const title = document.getElementById('confirmPanelTitle');
+        const hint = document.getElementById('confirmHint');
+        const extra = document.getElementById('confirmFormExtra');
+        const extraMore = document.getElementById('confirmFormExtraMore');
+        const err = document.getElementById('confirmFormError');
+        if (title) {
+            title.innerHTML = formMode
+                ? '<strong>Build your card</strong>'
+                : '<strong>Your card so far</strong>';
+        }
+        if (hint) {
+            hint.textContent = formMode
+                ? 'Pick a kind, name them, describe the look, then paint. No chat needed.'
+                : 'Tweak anything, then paint.';
+        }
+        if (extra) extra.hidden = !formMode;
+        if (extraMore) extraMore.hidden = !formMode;
+        if (err) {
+            err.hidden = true;
+            err.textContent = '';
+        }
+
+        const typeEl = document.getElementById('confirmType');
+        const subjectEl = document.getElementById('confirmSubject');
+        const settingEl = document.getElementById('confirmSetting');
+        const stakeEl = document.getElementById('confirmStake');
+        if (typeEl) typeEl.value = lastConcept.type || '';
+        if (subjectEl) subjectEl.value = lastConcept.subject || '';
+        if (settingEl) settingEl.value = lastConcept.setting || '';
+        if (stakeEl) stakeEl.value = lastConcept.stake || '';
+        document.getElementById('confirmNickname').value = lastConcept.nickname || (!formMode ? (lastConcept.subject || '') : '');
         document.getElementById('confirmVibe').value = lastConcept.vibe || '';
         document.getElementById('confirmDetails').value = lastConcept.details || '';
+        if (formMode) renderConfirmKindChips(lastConcept.type || '');
         renderConfirmNickChips(nickSuggestions);
         $confirmPanel.classList.add('visible');
+    }
+
+    function renderConfirmKindChips(selected) {
+        const wrap = document.getElementById('confirmKindChips');
+        const typeEl = document.getElementById('confirmType');
+        if (!wrap) return;
+        wrap.innerHTML = '';
+        const kinds = ['Bot', 'Android', 'Human', 'Critter'];
+        const current = String(selected || (typeEl && typeEl.value) || '').trim();
+        kinds.forEach((kind) => {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'suggestion-button confirm-kind-chip'
+                + (kind.toLowerCase() === current.toLowerCase() ? ' is-selected' : '');
+            btn.textContent = kind;
+            btn.addEventListener('click', () => {
+                if (typeEl) typeEl.value = kind;
+                wrap.querySelectorAll('.confirm-kind-chip').forEach((el) => {
+                    el.classList.toggle('is-selected', el.textContent === kind);
+                });
+            });
+            wrap.appendChild(btn);
+        });
+    }
+
+    function readConfirmPatch() {
+        const patch = {
+            nickname: document.getElementById('confirmNickname').value.trim(),
+            vibe: document.getElementById('confirmVibe').value.trim(),
+            details: document.getElementById('confirmDetails').value.trim(),
+        };
+        if (isFormPath()) {
+            const type = (document.getElementById('confirmType')?.value || '').trim();
+            const subject = (document.getElementById('confirmSubject')?.value || '').trim();
+            const setting = (document.getElementById('confirmSetting')?.value || '').trim();
+            const stake = (document.getElementById('confirmStake')?.value || '').trim();
+            if (type) patch.type = type;
+            if (subject) patch.subject = subject;
+            else if (patch.nickname) patch.subject = patch.nickname;
+            if (setting) patch.setting = setting;
+            if (stake) patch.stake = stake;
+        }
+        return patch;
+    }
+
+    function validateConfirmForm(patch) {
+        const err = document.getElementById('confirmFormError');
+        if (!isFormPath()) {
+            if (err) { err.hidden = true; err.textContent = ''; }
+            return true;
+        }
+        const missing = [];
+        if (!patch.type) missing.push('kind');
+        if (!patch.nickname && !patch.subject) missing.push('name or who they are');
+        if (!patch.details && !patch.vibe) missing.push('details or vibe');
+        if (missing.length) {
+            if (err) {
+                err.hidden = false;
+                err.textContent = 'Need: ' + missing.join(', ') + '.';
+            }
+            return false;
+        }
+        if (err) { err.hidden = true; err.textContent = ''; }
+        return true;
     }
 
     function renderConfirmNickChips(suggestions) {
@@ -802,6 +920,10 @@ body.chat-page .chat-messages.show-cardy-bg {
         $confirmPanel.classList.remove('visible');
         const wrap = document.getElementById('confirmNickChips');
         if (wrap) wrap.innerHTML = '';
+        const kinds = document.getElementById('confirmKindChips');
+        if (kinds) kinds.innerHTML = '';
+        const err = document.getElementById('confirmFormError');
+        if (err) { err.hidden = true; err.textContent = ''; }
     }
 
     async function ensureStudio() {
@@ -909,6 +1031,11 @@ body.chat-page .chat-messages.show-cardy-bg {
         if (lower.includes('talk') || lower.includes('chat') || lower.includes('tell me more')
             || lower.includes('about you') || lower.includes('about the ship') || lower.includes('learn more')) {
             return 'chat';
+        }
+        if (lower.includes('fill out a form') || lower.includes('fill in a form')
+            || lower.includes('use a form') || lower === 'form'
+            || (lower.includes('form') && !lower.includes('transform') && !lower.includes('format'))) {
+            return 'form';
         }
         if (lower.includes('remember') || lower.includes('detailed') || lower.includes('longer') || lower.includes('slow')) {
             return 'long';
@@ -1285,20 +1412,14 @@ body.chat-page .chat-messages.show-cardy-bg {
     $renderButton.addEventListener('click', handleRender);
 
     document.getElementById('confirmPaintBtn').addEventListener('click', () => {
-        const patch = {
-            nickname: document.getElementById('confirmNickname').value.trim(),
-            vibe: document.getElementById('confirmVibe').value.trim(),
-            details: document.getElementById('confirmDetails').value.trim(),
-        };
+        const patch = readConfirmPatch();
+        if (!validateConfirmForm(patch)) return;
         hideConfirmPanel();
         sendChat({ action: 'confirm', user_message: 'Paint it!', concept_patch: patch });
     });
     document.getElementById('confirmUpdateBtn').addEventListener('click', () => {
-        const patch = {
-            nickname: document.getElementById('confirmNickname').value.trim(),
-            vibe: document.getElementById('confirmVibe').value.trim(),
-            details: document.getElementById('confirmDetails').value.trim(),
-        };
+        const patch = readConfirmPatch();
+        if (isFormPath() && !validateConfirmForm(patch)) return;
         sendChat({ action: 'update_concept', concept_patch: patch });
     });
     document.getElementById('studioSaveBtn').addEventListener('click', () => handleSaveFramed(false));

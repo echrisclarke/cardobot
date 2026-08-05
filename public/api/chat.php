@@ -48,7 +48,7 @@ $staticSuggestions = [];
 $autoRender = false;
 
 $greetingMessage = "Oh. A visitor. I'm Cardy. I run Card-o-Bot aboard this ship: we invent someone together, then I print them onto a trading card. Want to make one with me?";
-$greetingSuggestions = ['Yeah, make a card', 'Make a detailed one', 'Just chat for now'];
+$greetingSuggestions = ['Yeah, make a card', 'Make a detailed one', 'Fill out a form', 'Just chat for now'];
 
 switch ($action) {
     case 'reset':
@@ -60,6 +60,19 @@ switch ($action) {
         $session['path'] = $sel['path'];
         $session['mode'] = $sel['mode'];
         $session['step'] = $sel['step'];
+        if ($sel['path'] === CARDY_PATH_FORM) {
+            // Form path: skip agenda chat; panel collects the card fields.
+            if ($userMessage !== '') {
+                $session['history'][] = ['role' => 'user', 'content' => $userMessage];
+            }
+            $session['visual_concept'] = cardy_scrub_meta_concept($session['visual_concept']);
+            $session['step'] = CARDY_STEP_CONFIRM;
+            $skipModel = true;
+            $staticMessage = 'Sure. Skip the Q and A. Fill this in, then I will print from what you wrote. *beep*';
+            $staticSuggestions = [];
+            $userMessage = '';
+            break;
+        }
         if ($userMessage !== '') {
             $session['history'][] = ['role' => 'user', 'content' => $userMessage];
             // Path chips / menu lines are never character answers
@@ -120,6 +133,12 @@ switch ($action) {
         }
         if ($userMessage !== '') {
             $session['history'][] = ['role' => 'user', 'content' => $userMessage];
+        }
+        // Paint needs a subject; form path may only have nickname.
+        $nick = trim((string)($session['visual_concept']['nickname'] ?? ''));
+        $subj = trim((string)($session['visual_concept']['subject'] ?? ''));
+        if ($subj === '' && $nick !== '') {
+            $session['visual_concept']['subject'] = $nick;
         }
         // Cardy invents a fresh printers-running line; then frontend starts paint.
         $session['visual_concept'] = cardy_ensure_power_ability($session['visual_concept']);

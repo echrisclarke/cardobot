@@ -241,6 +241,15 @@ function cardy_select_path_value(string $value): array {
     ) {
         return ['path' => CARDY_PATH_CHAT, 'mode' => CARDY_MODE_FREECHAT, 'step' => CARDY_STEP_FREE_CHAT];
     }
+    if (in_array($value, ['form', 'form_path'], true)
+        || str_contains($value, 'fill out a form')
+        || str_contains($value, 'fill in a form')
+        || str_contains($value, 'use a form')
+        || (preg_match('/\bform\b/', $value) && !str_contains($value, 'transform') && !str_contains($value, 'format'))
+    ) {
+        // Skip agenda chat; open the confirm-style form panel.
+        return ['path' => CARDY_PATH_FORM, 'mode' => CARDY_MODE_CARD, 'step' => CARDY_STEP_CONFIRM];
+    }
     if (in_array($value, ['long', 'remember', 'detailed'], true)
         || str_contains($value, 'detailed')
         || str_contains($value, 'remember')
