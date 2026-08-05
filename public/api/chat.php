@@ -39,9 +39,16 @@ if (mb_strlen($userMessage) > 1000) {
 
 $resumed = false;
 $refreshLocalePack = false;
+$isTestUser = cardobot_is_test_user((string)$username);
+
+// Test account: every page boot (resume with no session_id) is a clean English slate.
+// Login wipe alone is not enough if the browser stayed logged in with a Chinese session.
+if ($isTestUser && $action === 'resume' && $sessionId === '') {
+    cardobot_wipe_test_user_chat($userId);
+}
 
 if ($action === 'resume' && $sessionId === '') {
-    $loaded = cardy_session_load_for_user($userId);
+    $loaded = $isTestUser ? null : cardy_session_load_for_user($userId);
     if ($loaded !== null && cardy_session_is_resumable($loaded)) {
         $session = $loaded;
         $resumed = true;
@@ -63,13 +70,15 @@ $staticSuggestions = [];
 $autoRender = false;
 
 i18n_seed_presets_if_needed();
-$isTestUser = cardobot_is_test_user((string)$username);
 $prefLocale = $isTestUser ? null : i18n_user_preferred_locale($userId);
 if ($isTestUser) {
-    // Test account is always a clean English boot, even if the browser is Chinese.
-    i18n_set_session_locale('en');
+    // Test account boots in English. Mid-chat language switches still work once locale_picked.
+    i18n_set_session_locale(!empty($session['locale_picked']) && !empty($session['locale'])
+        ? (i18n_normalize_code((string)$session['locale']) ?: 'en')
+        : 'en');
     if (empty($session['locale_picked'])) {
         $session['locale'] = 'en';
+        i18n_set_session_locale('en');
     }
 }
 if (empty($session['locale']) && $prefLocale) {

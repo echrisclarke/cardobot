@@ -18,8 +18,17 @@ i18n_seed_presets_if_needed();
 $navLoc = function_exists('i18n_session_locale') ? i18n_session_locale() : 'en';
 $navUser = get_logged_in_user();
 $navUserId = (int)($navUser['id'] ?? 0);
-$navPreferred = $navUserId > 0 ? (i18n_user_preferred_locale($navUserId) ?: $navLoc) : $navLoc;
+$navIsTest = function_exists('cardobot_is_test_user')
+    && cardobot_is_test_user((string)($navUser['username'] ?? ''));
+// Test account boots English; don't sticky-select a prior Chinese preferred locale in the menu.
+$navPreferred = ($navUserId > 0 && !$navIsTest)
+    ? (i18n_user_preferred_locale($navUserId) ?: $navLoc)
+    : $navLoc;
 $navPreferred = i18n_normalize_code((string)$navPreferred) ?: 'en';
+if ($navIsTest) {
+    $navLoc = 'en';
+    $navPreferred = 'en';
+}
 ?>
 <!-- Mobile Header -->
 <div class="chat-header">
