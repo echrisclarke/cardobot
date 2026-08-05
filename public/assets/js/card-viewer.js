@@ -285,10 +285,11 @@
       this._closeSheets();
     }
 
-    _iconBtn(id, glyph, title, tone, needsMenu) {
+    _iconBtn(id, glyph, title, tone, needsMenu, showLabel) {
       const t = tone || 'teal';
       const menu = needsMenu ? ' cob-tool-has-menu' : '';
-      return `<button type="button" class="cob-tool-btn cob-tone-${t}${menu}" data-dock="${id}" title="${title}" aria-label="${title}">`
+      const label = (needsMenu || showLabel) ? ' cob-tool-show-label' : '';
+      return `<button type="button" class="cob-tool-btn cob-tone-${t}${menu}${label}" data-dock="${id}" title="${title}" aria-label="${title}">`
         + `<span class="ico">${glyph}</span>`
         + `<span class="cob-tool-caption">${title}</span>`
         + `</button>`;
@@ -303,9 +304,9 @@
       // Press Start tags in Card-o-Bot chip colors. Captions for menu tools.
       if (draw) {
         this.railLeft.innerHTML = [
-          this._iconBtn('brush', 'INK', 'Ink', 'mint'),
-          this._iconBtn('eraser', 'ERS', 'Erase', 'pink'),
-          this._iconBtn('hand', 'HND', 'Hand', 'beige'),
+          this._iconBtn('brush', 'INK', 'Ink', 'mint', false, true),
+          this._iconBtn('eraser', 'ERS', 'Erase', 'pink', false, true),
+          this._iconBtn('hand', 'HND', 'Hand', 'beige', false, true),
           this._iconBtn('brushes', 'TIP', 'Tips', 'teal', true),
           this._iconBtn('inkcolor', 'CLR', 'Color', 'pink', true),
           this._iconBtn('hud', 'SZ', 'Size', 'mint', true),
