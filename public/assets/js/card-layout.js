@@ -21,7 +21,7 @@
     // Press Start first; CJK/other scripts fall through to Noto / system.
     FACE_FONT: '"Press Start 2P", "Noto Sans SC", "Noto Sans JP", "Noto Sans", "Segoe UI", sans-serif',
     // Matches printed INFERENCE POWER / SPECIAL ABILITY chrome on the frame.
-    FACE_SANS: 'Roboto, "Noto Sans", "Segoe UI", sans-serif',
+    FACE_SANS: 'Roboto, "Open Sans", Helvetica, Arial, sans-serif',
     // Hard display caps for Press Start 2P (AI aims match; face shrinks, never ellipsis).
     LIMITS: {
       nickname: 16,
@@ -86,7 +86,7 @@
         textShadow: '0 0 3px rgba(0,0,0,0.95), 0 1px 0 rgba(0,0,0,0.8), 0 -1px 0 rgba(0,0,0,0.55)',
       };
     })(),
-    // type / weight / mass: type left matches BIO; mass stays at art-window right.
+    // type / size / mass: type left matches BIO; mass stays at art-window right.
     TYPE: (() => {
       const bioX = sx(72);
       const artW = Math.round(CARD_W * 0.85);

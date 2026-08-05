@@ -13,23 +13,35 @@
   overflow: hidden;
 }
 
-.cob-app-shell,
-.cob-app-shell * {
+.cob-app-shell {
   font-family: var(--font-family-retro, "Press Start 2P", "Courier New", monospace) !important;
 }
 
-.cob-app-shell .studio-type,
-.cob-app-shell .studio-type *,
-.cob-app-shell .studio-height,
-.cob-app-shell .studio-height *,
-.cob-app-shell .studio-mass,
-.cob-app-shell .studio-mass *,
-.cob-app-shell .studio-credit,
-.cob-app-shell .studio-credit *,
-.cob-app-shell .studio-power,
-.cob-app-shell .studio-power *,
-.cob-app-shell .studio-ability,
-.cob-app-shell .studio-ability *,
+/* Chrome only. Do NOT blanket-force Press Start onto the card face. */
+.cob-app-shell .cob-app-bar,
+.cob-app-shell .cob-app-bar *,
+.cob-app-shell .cob-dock,
+.cob-app-shell .cob-dock *,
+.cob-app-shell .cob-rail,
+.cob-app-shell .cob-rail *,
+.cob-app-shell .cob-app-title {
+  font-family: var(--font-family-retro, "Press Start 2P", "Courier New", monospace) !important;
+}
+
+.cob-app-shell .studio-card .studio-face-sans,
+.cob-app-shell .studio-card .studio-face-sans *,
+.cob-app-shell .studio-card .studio-type,
+.cob-app-shell .studio-card .studio-type *,
+.cob-app-shell .studio-card .studio-height,
+.cob-app-shell .studio-card .studio-height *,
+.cob-app-shell .studio-card .studio-mass,
+.cob-app-shell .studio-card .studio-mass *,
+.cob-app-shell .studio-card .studio-credit,
+.cob-app-shell .studio-card .studio-credit *,
+.cob-app-shell .studio-card .studio-power,
+.cob-app-shell .studio-card .studio-power *,
+.cob-app-shell .studio-card .studio-ability,
+.cob-app-shell .studio-card .studio-ability *,
 .cob-app-shell .cob-tool-btn,
 .cob-app-shell .cob-tool-btn *,
 .cob-app-shell .cob-hud,
@@ -40,7 +52,7 @@
 .cob-app-shell .cob-panel *,
 .cob-app-shell .cob-back-picker,
 .cob-app-shell .cob-back-picker * {
-  font-family: Roboto, "Noto Sans", "Segoe UI", sans-serif !important;
+  font-family: var(--font-family-face-sans, Roboto, "Open Sans", Helvetica, Arial, sans-serif) !important;
 }
 
 .cob-app-shell.open {

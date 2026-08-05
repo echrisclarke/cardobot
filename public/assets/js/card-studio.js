@@ -47,6 +47,7 @@
     _applyFaceFontSize(el, designFs) {
       if (!el) return;
       el.style.fontSize = this._faceFontPx(designFs) + 'px';
+      this._applyFaceFont(el);
     }
 
     _bindFaceResize() {
@@ -139,8 +140,11 @@
 
     _absText(cls, box) {
       const el = document.createElement('div');
-      el.className = cls;
+      const faceFont = this._faceFontForBox(box);
+      const isSans = !!(box && (box.fontFamily === 'sans' || box.fontFamily === (L().FACE_SANS)));
+      el.className = isSans ? (cls + ' studio-face-sans') : cls;
       el._box = box;
+      el._faceSans = isSans;
       const W = L().CARD_W;
       const H = L().CARD_H;
       const fs = box.fontSize || 14;
@@ -166,7 +170,6 @@
             // Right-aligned meta needs a hair of inset so units (t/kg) are not clipped.
             align === 'right' ? 'padding:0 0.2em 0 0' : 'padding:0',
           ];
-      const faceFont = this._faceFontForBox(box);
       el.style.cssText = [
         'position:absolute',
         'left:' + ((box.x / W) * 100).toFixed(2) + '%',
@@ -189,8 +192,7 @@
         'box-sizing:border-box',
         'margin:0',
       ].filter(Boolean).join(';');
-      // Ensure sans fields win over .studio-text Press Start inheritance.
-      el.style.setProperty('font-family', faceFont, 'important');
+      this._applyFaceFont(el);
       this.textLayer.appendChild(el);
       return el;
     }
@@ -198,10 +200,21 @@
     _faceFontForBox(box) {
       const layout = L();
       if (box && (box.fontFamily === 'sans' || box.fontFamily === layout.FACE_SANS)) {
-        return layout.FACE_SANS || 'Roboto, "Segoe UI", sans-serif';
+        return layout.FACE_SANS || 'Roboto, "Open Sans", Helvetica, Arial, sans-serif';
       }
       if (box && box.fontFamily) return box.fontFamily;
       return layout.FACE_FONT || '"Press Start 2P", "Courier New", monospace';
+    }
+
+    _applyFaceFont(el) {
+      if (!el) return;
+      const faceFont = this._faceFontForBox(el._box || {});
+      el.style.setProperty('font-family', faceFont, 'important');
+      if (el._faceSans || (el.classList && el.classList.contains('studio-face-sans'))) {
+        el.querySelectorAll('*').forEach((child) => {
+          child.style.setProperty('font-family', faceFont, 'important');
+        });
+      }
     }
 
     async _ensureFaceFont() {
@@ -273,7 +286,7 @@
             continue;
           }
           // Drop Type:/H:/M: prefix before eating into the label letters.
-          const labeled = value.match(/^(type|height|weight|mass|h|m)\s*:\s*(.+)$/i);
+          const labeled = value.match(/^(type|height|weight|size|mass|h|m)\s*:\s*(.+)$/i);
           if (labeled && labeled[2].length > 0) {
             value = labeled[2];
             el.textContent = value;
@@ -360,6 +373,7 @@
         group.appendChild(right);
       }
       el.appendChild(group);
+      this._applyFaceFont(el);
 
       const base = box.fontSize || 14;
       const minFs = box.minFontSize != null ? box.minFontSize : 5;
@@ -538,19 +552,19 @@
       }
       height = this._abbrevMeasure(height, 'height');
       mass = this._abbrevMeasure(mass, 'mass');
-      height = height.replace(/^(h|height|weight)\s*:\s*/i, '');
-      mass = mass.replace(/^(m|mass)\s*:\s*/i, '');
+      height = height.replace(/^(h|height|weight|size)\s*:\s*/i, '');
+      mass = mass.replace(/^(m|mass|weight)\s*:\s*/i, '');
       return {
         credit: user,
         type: 'type: ' + kind,
-        height: 'weight: ' + height,
+        height: 'size: ' + height,
         mass: 'mass: ' + mass,
       };
     }
 
     _abbrevMeasure(raw, kind) {
       let s = String(raw || '').trim();
-      s = s.replace(/^(height|mass)\s*:\s*/i, '');
+      s = s.replace(/^(height|size|mass|weight)\s*:\s*/i, '');
       s = s.replace(/,/g, '');
       const map = [
         [/(\d+(?:\.\d+)?)\s*(kilometers|kilometres)\b/gi, '$1 km'],

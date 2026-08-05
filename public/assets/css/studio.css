@@ -1,5 +1,5 @@
 /* Finish Card studio + hybrid reveal actions */
-@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Roboto:wght@400;500;700&family=Noto+Sans+SC:wght@400;700&family=Noto+Sans+JP:wght@400;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Roboto:wght@400;500;700&family=Open+Sans:wght@400;500;700&family=Noto+Sans+SC:wght@400;700&family=Noto+Sans+JP:wght@400;700&display=swap');
 
 .wizard-studio-panel {
   display: none;
@@ -98,6 +98,9 @@
   padding: 0;
 }
 
+/* type / size / mass + power / ability: never Press Start */
+.studio-text .studio-face-sans,
+.studio-text .studio-face-sans *,
 .studio-text .studio-type,
 .studio-text .studio-type *,
 .studio-text .studio-height,
@@ -110,7 +113,7 @@
 .studio-text .studio-power *,
 .studio-text .studio-ability,
 .studio-text .studio-ability * {
-  font-family: Roboto, "Noto Sans", "Segoe UI", sans-serif !important;
+  font-family: var(--font-family-face-sans, Roboto, "Open Sans", Helvetica, Arial, sans-serif) !important;
 }
 
 .studio-tools {
