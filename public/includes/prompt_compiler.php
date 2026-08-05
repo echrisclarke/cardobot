@@ -94,8 +94,8 @@ function build_render_prompt(array $concept, array $memoryHints = []): string {
 
     $parts[] = 'Strict 1:1 square FULL-BLEED image. Paint every pixel to the crop edges: no white margins, '
         . 'no letterboxing, no empty paper border, no vignette fade to blank. '
-        . 'Background and subject must reach all four corners. Unfinished linework is fine; bare empty margins are not. '
-        . 'Crop tight on the character so they occupy the well; do not float a small figure in empty space';
+        . 'Background, environment, and subject may fill the frame: space scenes, docks, rooms, landscapes, '
+        . 'and other settings are welcome when described. Unfinished linework is fine; bare empty margins are not.';
     $parts[] = 'CRITICAL: the image must contain absolutely no text of any kind. '
         . 'No titles, names, captions, labels, UI, logos, watermarks, letters, digits, or writing anywhere in the art. '
         . 'No card frame. Pure illustration only';
