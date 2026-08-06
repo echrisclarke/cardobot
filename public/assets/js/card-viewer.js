@@ -9,6 +9,122 @@
     '#95f5e3', '#f9bbaa', '#ffe5c0', '#7a5cff', '#3d8b40',
   ];
 
+  function hexToRgb(hex) {
+    const m = String(hex || '').trim().match(/^#?([0-9a-f]{3}|[0-9a-f]{6})$/i);
+    if (!m) return null;
+    let h = m[1];
+    if (h.length === 3) h = h.split('').map((c) => c + c).join('');
+    return {
+      r: parseInt(h.slice(0, 2), 16),
+      g: parseInt(h.slice(2, 4), 16),
+      b: parseInt(h.slice(4, 6), 16),
+    };
+  }
+
+  function rgbToHex(r, g, b) {
+    const c = (n) => Math.max(0, Math.min(255, Math.round(n))).toString(16).padStart(2, '0');
+    return '#' + c(r) + c(g) + c(b);
+  }
+
+  function rgbToHsv(r, g, b) {
+    r /= 255; g /= 255; b /= 255;
+    const max = Math.max(r, g, b);
+    const min = Math.min(r, g, b);
+    const d = max - min;
+    let h = 0;
+    if (d > 0) {
+      if (max === r) h = ((g - b) / d) % 6;
+      else if (max === g) h = (b - r) / d + 2;
+      else h = (r - g) / d + 4;
+      h *= 60;
+      if (h < 0) h += 360;
+    }
+    const s = max === 0 ? 0 : d / max;
+    return { h, s, v: max };
+  }
+
+  function hsvToRgb(h, s, v) {
+    const c = v * s;
+    const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
+    const m = v - c;
+    let r = 0, g = 0, b = 0;
+    if (h < 60) { r = c; g = x; }
+    else if (h < 120) { r = x; g = c; }
+    else if (h < 180) { g = c; b = x; }
+    else if (h < 240) { g = x; b = c; }
+    else if (h < 300) { r = x; b = c; }
+    else { r = c; b = x; }
+    return {
+      r: Math.round((r + m) * 255),
+      g: Math.round((g + m) * 255),
+      b: Math.round((b + m) * 255),
+    };
+  }
+
+  function extractPaletteFromImage(img, count) {
+    const want = count || 8;
+    if (!img || !img.width) return [];
+    try {
+      const size = 56;
+      const canvas = document.createElement('canvas');
+      canvas.width = size;
+      canvas.height = size;
+      const ctx = canvas.getContext('2d', { willReadFrequently: true });
+      if (!ctx) return [];
+      ctx.drawImage(img, 0, 0, size, size);
+      const data = ctx.getImageData(0, 0, size, size).data;
+      const buckets = new Map();
+      for (let i = 0; i < data.length; i += 4) {
+        if (data[i + 3] < 180) continue;
+        const r = data[i];
+        const g = data[i + 1];
+        const b = data[i + 2];
+        const max = Math.max(r, g, b);
+        const min = Math.min(r, g, b);
+        if (max < 22 || min > 248) continue;
+        // Favor mid/high chroma so ink picks feel useful.
+        if ((max - min) < 12 && max > 40 && max < 220) continue;
+        const qr = r >> 4;
+        const qg = g >> 4;
+        const qb = b >> 4;
+        const key = (qr << 8) | (qg << 4) | qb;
+        let slot = buckets.get(key);
+        if (!slot) {
+          slot = { r: 0, g: 0, b: 0, n: 0 };
+          buckets.set(key, slot);
+        }
+        slot.r += r;
+        slot.g += g;
+        slot.b += b;
+        slot.n += 1;
+      }
+      const ranked = Array.from(buckets.values())
+        .filter((s) => s.n >= 3)
+        .map((s) => ({
+          r: Math.round(s.r / s.n),
+          g: Math.round(s.g / s.n),
+          b: Math.round(s.b / s.n),
+          n: s.n,
+        }))
+        .sort((a, b) => b.n - a.n);
+
+      const picked = [];
+      ranked.forEach((c) => {
+        if (picked.length >= want) return;
+        const tooClose = picked.some((p) => {
+          const dr = p.r - c.r;
+          const dg = p.g - c.g;
+          const db = p.b - c.b;
+          return (dr * dr + dg * dg + db * db) < 1400;
+        });
+        if (!tooClose) picked.push(c);
+      });
+      return picked.map((c) => rgbToHex(c.r, c.g, c.b));
+    } catch (e) {
+      return [];
+    }
+  }
+
   // Card-o-Bot ink tool glyphs (Herb icons + console SVGs).
   const INK_ICONS = {
     brush: 'pen.svg',
@@ -62,6 +178,8 @@
       this.activeBrushId = 'hard-round';
       this.brushColor = '#646464';
       this.brushOpacity = 1;
+      this._pickerHsv = rgbToHsv(100, 100, 100);
+      this._artSwatches = [];
       this.activeTool = 'brush';
       this.studio = null;
       this._pointers = new Map();
@@ -113,11 +231,33 @@
             <h3>Ink color</h3>
             <span class="cob-color-chip" data-color-preview style="background:#646464"></span>
           </div>
-          <div class="cob-swatches" data-swatches></div>
-          <label class="cob-color-wheel-wrap">
-            <span class="cob-hud-label">Custom</span>
-            <input type="color" value="#646464" data-brush-color>
-          </label>
+          <div class="cob-picker" data-picker>
+            <div class="cob-picker-sv" data-sv tabindex="0" role="slider" aria-label="Saturation and brightness">
+              <div class="cob-picker-sv-cursor" data-sv-cursor></div>
+            </div>
+            <div class="cob-picker-hue" data-hue-bar tabindex="0" role="slider" aria-label="Hue">
+              <div class="cob-picker-hue-cursor" data-hue-cursor></div>
+            </div>
+            <div class="cob-picker-meta">
+              <label class="cob-picker-hex">
+                <span class="cob-hud-label">HEX</span>
+                <input type="text" data-hex maxlength="7" spellcheck="false" value="#646464" autocomplete="off">
+              </label>
+              <div class="cob-picker-rgb">
+                <label>R <input type="number" data-rgb-r min="0" max="255" step="1" value="100"></label>
+                <label>G <input type="number" data-rgb-g min="0" max="255" step="1" value="100"></label>
+                <label>B <input type="number" data-rgb-b min="0" max="255" step="1" value="100"></label>
+              </div>
+            </div>
+          </div>
+          <div class="cob-swatch-block">
+            <span class="cob-hud-label">Presets</span>
+            <div class="cob-swatches" data-swatches></div>
+          </div>
+          <div class="cob-swatch-block" data-art-block hidden>
+            <span class="cob-hud-label">From art</span>
+            <div class="cob-swatches cob-swatches-art" data-art-swatches></div>
+          </div>
           <button type="button" class="cob-app-btn" data-act="close-popovers">Close</button>
         </div>
         <div class="cob-sheet cob-panel" data-sheet-color>
@@ -185,6 +325,7 @@
 
       this._renderBackPicker();
       this._renderSwatches();
+      this._wireColorPicker();
       this._wireInkIconImgs(this.el);
       this._setBrushColor(this.brushColor);
 
@@ -209,7 +350,6 @@
 
       const sizeEl = this.el.querySelector('[data-brush-size]');
       const opacityEl = this.el.querySelector('[data-brush-opacity]');
-      const brushColorEl = this.el.querySelector('[data-brush-color]');
       if (sizeEl) {
         sizeEl.addEventListener('input', () => {
           const v = +sizeEl.value;
@@ -225,11 +365,6 @@
           this.el.querySelector('[data-opacity-val]').textContent = v + '%';
           const eng = this.studio && this.studio.getEngine();
           if (eng) eng.setOpacity(this.brushOpacity);
-        });
-      }
-      if (brushColorEl) {
-        brushColorEl.addEventListener('input', () => {
-          this._setBrushColor(brushColorEl.value);
         });
       }
 
@@ -263,13 +398,174 @@
     }
 
     _renderSwatches() {
-      const wrap = this.el.querySelector('[data-swatches]');
-      wrap.innerHTML = SWATCHES.map((c) =>
+      this._fillSwatchWrap(this.el.querySelector('[data-swatches]'), SWATCHES);
+    }
+
+    _fillSwatchWrap(wrap, colors) {
+      if (!wrap) return;
+      const list = Array.isArray(colors) ? colors : [];
+      wrap.innerHTML = list.map((c) =>
         `<button type="button" class="cob-swatch" data-swatch="${c}" style="background:${c}" aria-label="${c}"></button>`
       ).join('');
       wrap.querySelectorAll('[data-swatch]').forEach((btn) => {
         btn.addEventListener('click', () => this._setBrushColor(btn.getAttribute('data-swatch')));
       });
+      this._markActiveSwatches();
+    }
+
+    _markActiveSwatches() {
+      const cur = String(this.brushColor || '').toLowerCase();
+      this.el.querySelectorAll('[data-swatch]').forEach((btn) => {
+        btn.classList.toggle('is-active', String(btn.getAttribute('data-swatch') || '').toLowerCase() === cur);
+      });
+    }
+
+    _wireColorPicker() {
+      const sv = this.el.querySelector('[data-sv]');
+      const hueBar = this.el.querySelector('[data-hue-bar]');
+      const hexEl = this.el.querySelector('[data-hex]');
+      const rEl = this.el.querySelector('[data-rgb-r]');
+      const gEl = this.el.querySelector('[data-rgb-g]');
+      const bEl = this.el.querySelector('[data-rgb-b]');
+
+      const bindDrag = (el, onMove) => {
+        if (!el) return;
+        const move = (e) => {
+          if (e.cancelable) e.preventDefault();
+          onMove(e);
+        };
+        const up = () => {
+          window.removeEventListener('pointermove', move);
+          window.removeEventListener('pointerup', up);
+          window.removeEventListener('pointercancel', up);
+        };
+        el.addEventListener('pointerdown', (e) => {
+          if (e.button != null && e.button !== 0) return;
+          el.setPointerCapture && el.setPointerCapture(e.pointerId);
+          move(e);
+          window.addEventListener('pointermove', move, { passive: false });
+          window.addEventListener('pointerup', up);
+          window.addEventListener('pointercancel', up);
+        });
+      };
+
+      bindDrag(sv, (e) => {
+        const rect = sv.getBoundingClientRect();
+        const x = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+        const y = Math.max(0, Math.min(1, (e.clientY - rect.top) / rect.height));
+        this._pickerHsv.s = x;
+        this._pickerHsv.v = 1 - y;
+        this._applyPickerHsv(true);
+      });
+
+      bindDrag(hueBar, (e) => {
+        const rect = hueBar.getBoundingClientRect();
+        const x = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+        this._pickerHsv.h = x * 360;
+        this._applyPickerHsv(true);
+      });
+
+      if (hexEl) {
+        hexEl.addEventListener('change', () => {
+          let v = String(hexEl.value || '').trim();
+          if (v && v[0] !== '#') v = '#' + v;
+          const rgb = hexToRgb(v);
+          if (rgb) this._setBrushColor(rgbToHex(rgb.r, rgb.g, rgb.b));
+          else this._syncPickerFields();
+        });
+        hexEl.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter') hexEl.blur();
+        });
+      }
+
+      const onRgb = () => {
+        const r = Math.max(0, Math.min(255, +rEl.value || 0));
+        const g = Math.max(0, Math.min(255, +gEl.value || 0));
+        const b = Math.max(0, Math.min(255, +bEl.value || 0));
+        this._setBrushColor(rgbToHex(r, g, b));
+      };
+      [rEl, gEl, bEl].forEach((el) => {
+        if (!el) return;
+        el.addEventListener('change', onRgb);
+        el.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter') el.blur();
+        });
+      });
+    }
+
+    _applyPickerHsv(pushEngine) {
+      const { h, s, v } = this._pickerHsv;
+      const rgb = hsvToRgb(h, s, v);
+      const hex = rgbToHex(rgb.r, rgb.g, rgb.b);
+      this.brushColor = hex;
+      this._paintPickerChrome();
+      this._syncPickerFields();
+      this._markActiveSwatches();
+      if (pushEngine) {
+        const eng = this.studio && this.studio.getEngine();
+        if (eng) eng.setColor(hex);
+      }
+    }
+
+    _paintPickerChrome() {
+      const { h, s, v } = this._pickerHsv;
+      const hueRgb = hsvToRgb(h, 1, 1);
+      const hueHex = rgbToHex(hueRgb.r, hueRgb.g, hueRgb.b);
+      const sv = this.el.querySelector('[data-sv]');
+      const svCursor = this.el.querySelector('[data-sv-cursor]');
+      const hueCursor = this.el.querySelector('[data-hue-cursor]');
+      const preview = this.el.querySelector('[data-color-preview]');
+      if (sv) {
+        sv.style.background =
+          'linear-gradient(to top, #000, transparent),'
+          + 'linear-gradient(to right, #fff, ' + hueHex + ')';
+      }
+      if (svCursor) {
+        svCursor.style.left = (s * 100).toFixed(2) + '%';
+        svCursor.style.top = ((1 - v) * 100).toFixed(2) + '%';
+      }
+      if (hueCursor) {
+        hueCursor.style.left = ((h / 360) * 100).toFixed(2) + '%';
+      }
+      if (preview) preview.style.background = this.brushColor;
+    }
+
+    _syncPickerFields() {
+      const rgb = hexToRgb(this.brushColor) || { r: 100, g: 100, b: 100 };
+      const hexEl = this.el.querySelector('[data-hex]');
+      const rEl = this.el.querySelector('[data-rgb-r]');
+      const gEl = this.el.querySelector('[data-rgb-g]');
+      const bEl = this.el.querySelector('[data-rgb-b]');
+      if (hexEl && document.activeElement !== hexEl) hexEl.value = this.brushColor;
+      if (rEl && document.activeElement !== rEl) rEl.value = String(rgb.r);
+      if (gEl && document.activeElement !== gEl) gEl.value = String(rgb.g);
+      if (bEl && document.activeElement !== bEl) bEl.value = String(rgb.b);
+    }
+
+    async _refreshArtSwatches() {
+      const block = this.el.querySelector('[data-art-block]');
+      const wrap = this.el.querySelector('[data-art-swatches]');
+      let img = this.studio && this.studio.artImage;
+      if (!img && this.artUrl) {
+        try {
+          img = await new Promise((resolve, reject) => {
+            const el = new Image();
+            el.crossOrigin = 'anonymous';
+            el.onload = () => resolve(el);
+            el.onerror = reject;
+            el.src = this.artUrl;
+          });
+        } catch (e) {
+          img = null;
+        }
+      }
+      if (!img) {
+        const frontImg = this.front && this.front.querySelector('img');
+        if (frontImg && frontImg.naturalWidth) img = frontImg;
+      }
+      this._artSwatches = extractPaletteFromImage(img, 8);
+      this._fillSwatchWrap(wrap, this._artSwatches);
+      if (block) block.hidden = this._artSwatches.length === 0;
     }
 
     _inkIcon(key) {
@@ -287,13 +583,16 @@
     }
 
     _setBrushColor(color) {
-      this.brushColor = color;
-      const input = this.el.querySelector('[data-brush-color]');
-      if (input) input.value = color;
-      const preview = this.el.querySelector('[data-color-preview]');
-      if (preview) preview.style.background = color;
+      const rgb = hexToRgb(color);
+      if (!rgb) return;
+      const hex = rgbToHex(rgb.r, rgb.g, rgb.b);
+      this.brushColor = hex;
+      this._pickerHsv = rgbToHsv(rgb.r, rgb.g, rgb.b);
+      this._paintPickerChrome();
+      this._syncPickerFields();
+      this._markActiveSwatches();
       const eng = this.studio && this.studio.getEngine();
-      if (eng) eng.setColor(color);
+      if (eng) eng.setColor(hex);
     }
 
     async _loadBrushes() {
@@ -477,6 +776,7 @@
       this._setBackVariant(this.backVariant);
       this._applyBackTint();
       this._applyTransform();
+      this._refreshArtSwatches();
 
       this.el.classList.add('open');
       document.body.classList.add('cob-app-open');
@@ -609,7 +909,12 @@
       if (id === 'inkcolor') {
         this.hud.classList.remove('open', 'pinned');
         this._closeSheets();
-        this.popoverColor.classList.toggle('open');
+        const opening = !this.popoverColor.classList.contains('open');
+        this.popoverColor.classList.toggle('open', opening);
+        if (opening) {
+          this._setBrushColor(this.brushColor);
+          this._refreshArtSwatches();
+        }
         return;
       }
       if (id === 'hud') {
