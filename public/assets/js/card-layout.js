@@ -23,6 +23,7 @@
     // Matches printed INFERENCE POWER / SPECIAL ABILITY chrome on the frame.
     FACE_SANS: 'Roboto, "Open Sans", Helvetica, Arial, sans-serif',
     // Hard display caps for Press Start 2P (AI aims match; face shrinks, never ellipsis).
+    // Dock Shift: ability_* = Job title/check; power_* = catalog effect; stats print 0–999.
     LIMITS: {
       nickname: 16,
       power_name: 12,
@@ -32,6 +33,8 @@
       // Soft cap only; face shrink-to-fit owns the real well budget.
       bio: 220,
     },
+    // Breach companion cards reuse the same canvas; bio carries play_text.
+    BREACH_FACE: true,
     NAME_INKS: {
       slate: 'rgba(88,88,88,1)',
       charcoal: 'rgba(54,62,70,1)',
@@ -161,7 +164,7 @@
     ],
     STAT_COLOR: 'rgba(255,255,255,0.95)',
     BACKS: [
-      'back-01.jpg', 'back-02.jpg', 'back-03.png', 'back-04.png',
+      'back-01.jpg', 'back-02.jpg', 'back-04.png',
       'back-05.png', 'back-06.png', 'back-07.jpg', 'back-08.jpg',
     ],
   };

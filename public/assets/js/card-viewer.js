@@ -202,13 +202,16 @@
         <div class="cob-stage">
           <div class="cob-rail cob-rail-left" data-rail-left></div>
           <div class="cob-rail cob-rail-right" data-rail-right></div>
+          <aside class="cob-back-picker" data-back-picker aria-label="Card back designs">
+            <div class="cob-back-picker-head">Backs</div>
+            <div class="cob-back-picker-list" data-back-list></div>
+          </aside>
           <div class="cob-card-viewport" data-viewport>
             <div class="cob-card-inner" data-inner>
               <div class="cob-face cob-face-front" data-front></div>
               <div class="cob-face cob-face-back" data-back>
                 <div class="cob-back-tint" data-back-tint></div>
                 <img class="cob-back-art" data-back-art alt="Card back">
-                <div class="cob-back-picker" data-back-picker></div>
               </div>
             </div>
           </div>
@@ -374,12 +377,13 @@
 
     _renderBackPicker() {
       const backs = (global.CardobotLayout && global.CardobotLayout.BACKS) || [];
-      this.backPicker.innerHTML = backs.map((file, i) =>
+      const list = this.backPicker.querySelector('[data-back-list]') || this.backPicker;
+      list.innerHTML = backs.map((file, i) =>
         `<button type="button" class="cob-back-thumb${i === this.backVariant ? ' active' : ''}" data-back-idx="${i}" title="Back ${i + 1}">
           <img src="${this.assetBase}/assets/img/cardbacks/${file}" alt="">
         </button>`
       ).join('');
-      this.backPicker.querySelectorAll('[data-back-idx]').forEach((btn) => {
+      list.querySelectorAll('[data-back-idx]').forEach((btn) => {
         btn.addEventListener('click', (e) => {
           e.stopPropagation();
           this._setBackVariant(+btn.getAttribute('data-back-idx'));
@@ -390,10 +394,13 @@
     _setBackVariant(idx) {
       const backs = (global.CardobotLayout && global.CardobotLayout.BACKS) || [];
       if (!backs.length) return;
-      this.backVariant = ((idx % backs.length) + backs.length) % backs.length;
+      const n = backs.length;
+      let next = Number.isFinite(+idx) ? Math.round(+idx) : 0;
+      if (next < 0 || next >= n) next = ((next % n) + n) % n;
+      this.backVariant = next;
       this.backArt.src = this.assetBase + '/assets/img/cardbacks/' + backs[this.backVariant];
-      this.backPicker.querySelectorAll('.cob-back-thumb').forEach((el, i) => {
-        el.classList.toggle('active', i === this.backVariant);
+      this.backPicker.querySelectorAll('.cob-back-thumb').forEach((el) => {
+        el.classList.toggle('active', +el.getAttribute('data-back-idx') === this.backVariant);
       });
     }
 
@@ -730,7 +737,12 @@
       this.pan = { x: 0, y: 0 };
       this.activeTool = 'brush';
 
-      if (payload.backVariant != null) this.backVariant = +payload.backVariant || 0;
+      if (payload.backVariant != null) {
+        const backs = (global.CardobotLayout && global.CardobotLayout.BACKS) || [];
+        let v = +payload.backVariant || 0;
+        if (backs.length) v = Math.max(0, Math.min(backs.length - 1, Math.round(v)));
+        this.backVariant = v;
+      }
       if (payload.backHsl) {
         this.backHue = +payload.backHsl.hue || this.backHue;
         this.backSat = +payload.backHsl.saturation || this.backSat;
