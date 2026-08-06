@@ -229,22 +229,35 @@ switch ($action) {
         break;
 
     case 'reset':
+        // "Make another one": continuous conversation, not a cold first visit.
         $keepLocale = i18n_normalize_code((string)($session['locale'] ?? $prefLocale ?? 'en')) ?: 'en';
         $hadLocale = !empty($session['locale_picked']) || !empty($prefLocale);
+        $started = cardy_session_start_another($session, $hadLocale, $keepLocale);
+        $prevNick = (string)($started['prev_nickname'] ?? '');
         if ($userId > 0) {
             cardy_session_clear_for_user($userId);
         }
-        $session = cardy_session_create();
+        $session = $started['session'];
         $skipModel = true;
-        if ($hadLocale && $keepLocale !== '') {
-            $greet = $cardy_preferred_greeting($session, $keepLocale);
-            $staticMessage = $greet['message'];
-            $staticSuggestions = $greet['suggestions'];
+        i18n_set_session_locale($keepLocale);
+        $loc = $keepLocale;
+        $refreshLocalePack = true;
+        $name = trim((string)$username);
+        if ($name !== '' && $prevNick !== '' && mb_strtolower($prevNick) !== mb_strtolower($name)) {
+            $staticMessage = i18n_t('chat.another_after', $keepLocale, [
+                'name' => $name,
+                'prev' => $prevNick,
+            ]);
+        } elseif ($name !== '') {
+            $staticMessage = i18n_t('chat.another', $keepLocale, ['name' => $name]);
         } else {
-            $greet = $cardy_boot_greeting($session, $userId, $prefLocale, $navigatorLanguages);
-            $staticMessage = $greet['message'];
-            $staticSuggestions = $greet['suggestions'];
+            $staticMessage = i18n_t('chat.another_anon', $keepLocale);
         }
+        $staticSuggestions = $pathChipsFor($keepLocale);
+        if ($userMessage === '') {
+            $userMessage = 'Make another one';
+        }
+        $session['history'][] = ['role' => 'user', 'content' => $userMessage];
         $userMessage = '';
         break;
 

@@ -366,6 +366,37 @@ function cardy_session_reset(array $session): array {
     return cardy_session_create();
 }
 
+/**
+ * Start a new card inside a continuous conversation (not a cold first visit).
+ *
+ * @return array{session: array, prev_nickname: string, cards_made: int}
+ */
+function cardy_session_start_another(array $oldSession, bool $localePicked, string $locale): array {
+    $prevNick = trim((string)(($oldSession['visual_concept']['nickname'] ?? '') ?: ($oldSession['visual_concept']['subject'] ?? '')));
+    if (mb_strlen($prevNick) > 24) {
+        $prevNick = mb_substr($prevNick, 0, 24);
+    }
+    $cardsMade = (int)($oldSession['cards_made'] ?? 0) + 1;
+    $session = cardy_session_create();
+    $session['locale'] = $locale !== '' ? $locale : 'en';
+    $session['locale_picked'] = $localePicked;
+    $session['awaiting_locale_confirm'] = false;
+    $session['awaiting_other_locale'] = false;
+    $session['awaiting_language_switch'] = false;
+    $session['resume_offered'] = false;
+    $session['returning_maker'] = true;
+    $session['cards_made'] = max(1, $cardsMade);
+    $session['step'] = CARDY_STEP_GREETING;
+    $session['mode'] = null;
+    $session['path'] = null;
+    $session['history'] = [];
+    return [
+        'session' => $session,
+        'prev_nickname' => $prevNick,
+        'cards_made' => (int)$session['cards_made'],
+    ];
+}
+
 function cardy_is_ready_to_render(array $session): bool {
     $path = cardy_session_path($session);
     if ($path === CARDY_PATH_CHAT) {

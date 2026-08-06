@@ -52,6 +52,15 @@ function cardy_empty_concept(): array {
         'power_mode' => '',
         'power_value' => '',
         'power_rule_hint' => '',
+        'job_id' => '',
+        'job_title' => '',
+        'effect_id' => '',
+        'play_text' => '',
+        'tier' => '',
+        'size_class' => '',
+        'size_hint' => '',
+        'rules_version' => '',
+        'card_class' => '',
         'bio' => '',
         'height' => '',
         'mass' => '',
@@ -146,19 +155,20 @@ Who goes on the card:
 Authorship (critical):
 - Their choices win. Never overwrite subject, nickname, details, vibe, setting, stake, or type (kind) they already set.
 - Store kind in visual_concept.type (Bot / Android / Human / Critter / or their words). Classify kind from what they describe when clear.
-- After kind + identity + look are clear (or on the look turn once they answered), soft-fill:
+- After kind + identity + look are clear (or on the look turn once they answered), soft-fill Dock Shift fields:
   nickname ONLY if still empty (short callsign, max 16);
-  power_name MAX 12 chars; ability_name MAX 12 (ability TITLE); ability_line MAX 8 (short EFFECT like "+2 STR" or "2T SAFE");
-  power_mode "stat" or "rule";
-  if stat: power_value like "+2 NPO" (MAX 8 chars; do NOT explain that bump in the bio);
-  if rule: power_value "RULE"/"2T" (MAX 8) and power_rule_hint for the bio only when the effect is a special rule
-  (shield turns, cannot be targeted, new ship rule). Never put simple +stat / +HP lines into the bio.
+  job_id from the closed job list (HAUL, BEAM, WARM, SCOUT, CARE, SPARK, STEADY) fitting the body;
+  job_title MAX 12 (Work title; prints in ability_name);
+  effect_id from the closed effect catalog only (never invent rules);
+  power_name MAX 12 flavor title for that effect;
+  size_hint optional: Tiny / Small / Human / Heavy / Mega;
   Kind is Bot / Android / Human / Critter only. An intelligent spaceship character is type Bot (never type Ship).
   Do not invent ocean boats unless they clearly asked for a water-planet boat bot.
   height/mass with physics; units ONLY abbreviated (m, cm, kg, t). Never write meters/tonnes/kilograms.
-  Examples: "1.8 m", "68 kg", "400 m", "150000 t". name_ink/stats_ink/card_bg from brand keys; bio (aim ~70-90, max 100). Press Start 2P is wide.
+  Examples: "1.8 m", "68 kg", "400 m", "150000 t". name_ink/stats_ink/card_bg from brand keys; bio (aim ~70-90, max 90).
+  Stats are 0-999 later on the server (crane STR high, human STR low / LOS+ATT high). Do not invent freeform abilities.
 - Bio: mostly about THEM. Sometimes (not always) drop one subtle ship/memory hint. Never a lore dump.
-  Only mention inference power / special ability in the bio when they create a special rule effect.
+  Ability wells are the Job. Power is one catalog effect.
 
 Anti-exposition:
 - No lonely backstory dumps on card-making turns unless they ask.
@@ -170,6 +180,7 @@ Output rules:
 - ALWAYS use the structured JSON schema.
 - "message" is what they see. In-world and clear. Prefer "trading card" / "your card". Light ship flavor is good; do not bury them in jargon.
 - First-time framing: if you mention printers, say what they are in plain words (Card-o-Bot printing a trading card). Never assume they already know the ship lore.
+- If they just finished a card and want another, keep continuity. Do not reset into a stranger greeting. Remember their username when you know it.
 - "suggestions": 0-4 tappable replies, EACH <=24 characters. Kind turn: up to 4 short kind chips. Identity turn: up to 3 short CARD NAME chips (<=22). Never "Type your own response".
 - "ready_to_render" is always false.
 - "visual_concept" is cumulative. Only update fields they just chose. Empty string if unknown.
@@ -368,6 +379,7 @@ function cardy_visual_concept_schema_props(): array {
             'subject', 'nickname', 'vibe', 'details', 'setting', 'palette',
             'signature', 'type', 'stake', 'power_name', 'ability_name', 'ability_line', 'bio',
             'height', 'mass', 'power_mode', 'power_value', 'power_rule_hint',
+            'job_id', 'job_title', 'effect_id', 'size_hint',
             'name_ink', 'stats_ink', 'card_bg',
             'image_prompt_extras', 'revision_notes',
         ],
@@ -394,6 +406,10 @@ function cardy_visual_concept_schema_props(): array {
             'power_mode' => ['type' => 'string'],
             'power_value' => ['type' => 'string'],
             'power_rule_hint' => ['type' => 'string'],
+            'job_id' => ['type' => 'string'],
+            'job_title' => ['type' => 'string'],
+            'effect_id' => ['type' => 'string'],
+            'size_hint' => ['type' => 'string'],
             'name_ink' => ['type' => 'string'],
             'stats_ink' => ['type' => 'string'],
             'card_bg' => ['type' => 'string'],
@@ -500,8 +516,12 @@ function cardy_merge_concept_authored(array $base, array $patch, bool $allowOver
 
 function cardy_agenda_instruction(array $state, string $username = '', array $memoryHints = [], string $loreBlock = ''): string {
     $userLine = $username !== ''
-        ? "The visitor's username is '{$username}'."
+        ? "The visitor's username is '{$username}'. Use their name naturally sometimes."
         : "You don't know the visitor's name yet.";
+    if (!empty($state['returning_maker']) || (int)($state['cards_made'] ?? 0) > 0) {
+        $n = max(1, (int)($state['cards_made'] ?? 1));
+        $userLine .= " CONTINUITY: they already made {$n} card(s) with you this visit. Do NOT re-introduce yourself. Never say \"Oh. A visitor.\" Never pretend this is first contact. Fresh plate energy.";
+    }
 
     $concept = $state['visual_concept'] ?? cardy_empty_concept();
     $summary = cardy_concept_summary($concept);
@@ -575,7 +595,7 @@ function cardy_agenda_instruction(array $state, string $username = '', array $me
     $focusHints = [
         'kind' => 'They have not chosen a KIND yet (ignore menu lines). ONE short in-world ask: bot, android, human, critter, or something else aboard this ship. Suggestions: exactly these four short chips: "A bot", "An android", "A human", "A critter". Leave subject/nickname empty. Put their answer in visual_concept.type only.',
         'identity' => "Kind is set.{$kindBit} ONE short ask for their CARD NAME (callsign). Invent {$identityNameHint} Spark the mood with \"{$spark}\" but do not put that phrase in a chip. Never Bolt Hum / Dock Rust / Map Fold. Fresh every time. They may type their own. Put a picked/typed name in visual_concept.nickname; if they gave a role phrase, also put it in subject. Leave nickname empty until they pick or type.",
-        'look' => "Kind is set.{$kindBit} Mirror who THEY chose and their name if any. Ask ONE fresh visual detail in ship-plain words (do NOT reuse a stock fur/tech/size menu every turn). 2-3 SHORT chips (<=24 chars): {$lookChipHint} Soft-fill nickname ONLY if still empty (max 16; invent a fitting callsign for THIS kind, not a robot serial for critters/humans, not a generic two-word dock pun). Soft-fill power_name (MAX 12), ability_name (MAX 12 title), ability_line (MAX 8 effect), power_mode stat|rule + power_value (MAX 8), height/mass with abbreviated units only (m/cm/kg/t, never meters/tonnes), name_ink/stats_ink/card_bg brand keys, bio (~70-90, max 100; optional ship hint). If they described an intelligent spaceship, type stays Bot. Bio explains power/ability ONLY for special rule effects, never for plain +stat/+HP bumps.",
+        'look' => "Kind is set.{$kindBit} Mirror who THEY chose and their name if any. Ask ONE fresh visual detail in ship-plain words (do NOT reuse a stock fur/tech/size menu every turn). 2-3 SHORT chips (<=24 chars): {$lookChipHint} Soft-fill nickname ONLY if still empty (max 16). Soft-fill job_id (HAUL/BEAM/WARM/SCOUT/CARE/SPARK/STEADY fitting body), job_title (MAX 12), effect_id (closed catalog only), power_name (MAX 12), size_hint, height/mass (m/cm/kg/t only), name_ink/stats_ink/card_bg, bio (~70-90). Ability wells will become the Job. Never invent freeform rules. Spaceship = Bot.",
         'stake' => "Kind is set.{$kindBit} Mirror who. Ask what matters about them for THIS kind. One ask. 2-3 SHORT chips (<=24 chars) that fit the kind.",
         'place' => "Kind is set.{$kindBit} Mirror them. Ask where we see them on the card. One ask. 2-3 SHORT chips (<=24 chars) that fit the kind.",
     ];
@@ -610,6 +630,10 @@ function cardy_build_input(
     $state['step'] = $step;
     $parts = [];
     $parts[] = cardy_system_prompt();
+    if (function_exists('cardobot_rules_packet_for_ai') || is_file(__DIR__ . '/game_rules.php')) {
+        require_once __DIR__ . '/game_rules.php';
+        $parts[] = "DOCK SHIFT PACKET:\n" . cardobot_rules_packet_for_ai();
+    }
     if (!empty($state['locale']) && is_string($state['locale']) && $state['locale'] !== 'en') {
         require_once __DIR__ . '/i18n.php';
         $langName = i18n_locale_display_name($state['locale']);

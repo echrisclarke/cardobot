@@ -38,6 +38,9 @@ function i18n_catalog_en(): array {
         'chat.type_own' => 'Type your own response',
         'chat.intro_story' => 'You\'ve just docked your ship and stepped aboard a vessel drifting above an unknown world. The corridors are silent, save for the hum of ancient systems. In a dimly lit chamber, you find a matter-compiled device resting on a console. The words "Card-o-Bot" are etched above its screen.',
         'chat.greeting' => "Oh. A visitor. I'm Cardy. I run Card-o-Bot aboard this ship: we invent someone together, then I print them onto a trading card. Want to make one with me?",
+        'chat.another' => "Alright, {name}. Fresh plate. Want another quick card, a longer one, a form, or just talk?",
+        'chat.another_anon' => 'Alright. Fresh plate. Want another quick card, a longer one, a form, or just talk?',
+        'chat.another_after' => "Alright, {name}. {prev} is on the stack. Fresh plate. Want another quick card, a longer one, a form, or just talk?",
 
         'lang.prompt' => 'Which language should we use on this console?',
         'lang.english' => 'English',

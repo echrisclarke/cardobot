@@ -1071,7 +1071,7 @@ body.chat-page .chat-messages.show-cardy-bg {
         chip('View card', () => openCardApp('viewer'));
         chip('Draw on it', () => openCardApp('draw'));
         chip('Change something', () => promptRevise());
-        chip('Make another one', handleMakeAnother);
+        chip('Make another one', () => handleMakeAnother());
 
         $chatMessages.appendChild(wrap);
         $chatMessages.scrollTop = $chatMessages.scrollHeight;
@@ -1415,7 +1415,7 @@ body.chat-page .chat-messages.show-cardy-bg {
             if (isResumeNewCardChip(text)) {
                 state.resumeOffered = false;
                 appendUserMessage(text);
-                handleMakeAnother();
+                handleMakeAnother({ skipUserEcho: true });
                 return;
             }
             if (isChangeLanguageChip(text)) {
@@ -1544,7 +1544,7 @@ body.chat-page .chat-messages.show-cardy-bg {
             if (isResumeNewCardChip(text)) {
                 state.resumeOffered = false;
                 appendUserMessage(text);
-                handleMakeAnother();
+                handleMakeAnother({ skipUserEcho: true });
                 return;
             }
         }
@@ -1859,12 +1859,27 @@ body.chat-page .chat-messages.show-cardy-bg {
         if (saveBtn) saveBtn.textContent = 'Saved!';
     }
 
-    function handleMakeAnother() {
+    function handleMakeAnother(opts) {
         if (state.busy) return;
+        const options = (opts && typeof opts === 'object' && !opts.target) ? opts : {};
         resetUiForNewSession();
-        // Reset on the server gives us a brand-new session id and a fresh
-        // greeting reply. We skip the intro story for repeat sessions.
-        sendChat({ action: 'reset' });
+        hideConfirmPanel();
+        $studioPanel.classList.remove('visible');
+        if (cardViewer && typeof cardViewer.close === 'function') {
+            try { cardViewer.close(); } catch (e) { /* ignore */ }
+        }
+        state.path = null;
+        state.mode = null;
+        state.visualConcept = null;
+        lastConcept = {};
+        lastStats = null;
+        lastArtUrl = null;
+        const echo = t('reveal.make_another', 'Make another one');
+        if (!options.skipUserEcho) {
+            appendUserMessage(echo);
+        }
+        // Continuity reset: same conversation energy, not the cold visitor greeting.
+        sendChat({ action: 'reset', user_message: echo });
     }
 
     // ============================================================
