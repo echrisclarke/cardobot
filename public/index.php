@@ -22,6 +22,13 @@ require_auth();
 $basePath = get_base_path();
 $assetPath = get_asset_path();
 $cardobotUsername = (string)(get_username() ?: 'Cardy');
+$bootUserId = (int)(get_logged_in_user()['id'] ?? 0);
+if ($bootUserId <= 0 && function_exists('ensure_user_row')) {
+    $bootUserId = (int)(ensure_user_row() ?: 0);
+}
+$bootSkipIntro = $bootUserId > 0 && function_exists('cardobot_user_should_skip_intro')
+    && cardobot_user_should_skip_intro($bootUserId)
+    && !cardobot_is_test_user($cardobotUsername);
 
 console_start('Card-o-Bot');
 $contentClosed = console_content_end();
@@ -209,16 +216,16 @@ body.chat-page .chat-messages.show-cardy-bg {
 <script>document.body.classList.add('chat-page');</script>
 
 <div class="chat-messages" id="chatMessages">
-    <!-- Stage 1: intro story -->
-    <div class="intro-message" id="introMessage">
+    <!-- Stage 1: intro story (first visit only) -->
+    <div class="intro-message<?php echo $bootSkipIntro ? ' hidden' : ''; ?>" id="introMessage">
         <p data-i18n="chat.intro_story">You've just docked your ship and stepped aboard a vessel drifting above an unknown world. The corridors are silent, save for the hum of ancient systems. In a dimly lit chamber, you find a matter-compiled device resting on a console. The words "Card-o-Bot" are etched above its screen.</p>
-        <div class="continue-button-container" id="introContinueBtn">
+        <div class="continue-button-container<?php echo $bootSkipIntro ? ' hidden' : ''; ?>" id="introContinueBtn">
             <button type="button" class="continue-button" data-i18n="chat.continue">Continue</button>
         </div>
     </div>
 
-    <!-- Stage 2: loading bar (hidden until first Continue) -->
-    <div class="chat-loading-bar hidden" id="chatLoadingBar">
+    <!-- Stage 2: loading bar (first visit after Continue; returning users see a short wake) -->
+    <div class="chat-loading-bar<?php echo $bootSkipIntro ? '' : ' hidden'; ?>" id="chatLoadingBar">
         <div class="loading-bar-container">
             <div class="loading-bar-fill"></div>
         </div>
@@ -299,6 +306,7 @@ body.chat-page .chat-messages.show-cardy-bg {
     const basePath = <?php echo json_encode($basePath); ?>;
 
     const $chatMessages    = document.getElementById('chatMessages');
+    const bootSkipIntro    = <?php echo $bootSkipIntro ? 'true' : 'false'; ?>;
     const $introMessage    = document.getElementById('introMessage');
     const $introContinue   = document.getElementById('introContinueBtn');
     const $chatLoadingBar  = document.getElementById('chatLoadingBar');
@@ -591,6 +599,7 @@ body.chat-page .chat-messages.show-cardy-bg {
         state.greeting = data;
         state.greetingReady = true;
         state.resumed = !!data.resumed;
+        state.skipIntro = !!(data.skip_intro || bootSkipIntro || data.resumed);
         state.resumeHistory = Array.isArray(data.history) ? data.history : null;
         state.resumeOffered = !!data.resumed;
         if (data.locale) {
@@ -606,6 +615,19 @@ body.chat-page .chat-messages.show-cardy-bg {
         $chatMessages.classList.add('show-cardy-bg');
         state.introComplete = true;
         state.cardyFirstMessageShown = true;
+    }
+
+    function bootPastIntro() {
+        skipIntroChrome();
+        markGreetingReady();
+        showCardyGreeting();
+    }
+
+    function markIntroSeenQuietly() {
+        postJson(basePath + '/api/chat.php', {
+            action: 'mark_intro_seen',
+            session_id: state.sessionId || '',
+        }).catch(() => {});
     }
 
     function restoreResumedTranscript(data) {
@@ -653,6 +675,10 @@ body.chat-page .chat-messages.show-cardy-bg {
             if (data.resumed) {
                 restoreResumedTranscript(data);
                 markGreetingReady();
+                return;
+            }
+            if (state.skipIntro || bootSkipIntro) {
+                bootPastIntro();
                 return;
             }
             markGreetingReady();
@@ -793,6 +819,8 @@ body.chat-page .chat-messages.show-cardy-bg {
         state.introComplete = true;
         const messageEl = appendCardyMessage(state.greeting.message, true);
         appendSuggestionsAfter(messageEl, state.greeting.suggestions);
+        // First successful Cardy hello locks out the dock story for later visits.
+        markIntroSeenQuietly();
     }
 
     // ============================================================

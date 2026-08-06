@@ -132,8 +132,11 @@ $cardy_apply_locale = static function (array &$session, string $code, int $userI
     ];
 };
 
-/** Returning user with a saved language: greet fully in that language + easy switch chip. */
-$cardy_preferred_greeting = static function (array &$session, string $code) use (&$loc, &$refreshLocalePack, $pathChipsFor): array {
+/**
+ * Saved-language greeting + path chips.
+ * $returning=true uses welcome-back copy (skip dock intro); false uses first-meet Cardy line.
+ */
+$cardy_preferred_greeting = static function (array &$session, string $code, bool $returning = false) use (&$loc, &$refreshLocalePack, $pathChipsFor, $username): array {
     $nameEn = I18N_PRESET_LOCALES[$code]['name_en'] ?? $code;
     $nameNative = I18N_PRESET_LOCALES[$code]['name_native'] ?? $code;
     // Never block greeting on AI translation.
@@ -147,8 +150,16 @@ $cardy_preferred_greeting = static function (array &$session, string $code) use 
     i18n_set_session_locale($code);
     $loc = $code;
     $refreshLocalePack = true;
+    if ($returning) {
+        $name = trim((string)$username);
+        $message = $name !== ''
+            ? i18n_t('chat.returning', $code, ['name' => $name])
+            : i18n_t('chat.returning_anon', $code);
+    } else {
+        $message = i18n_t('chat.greeting', $code);
+    }
     return [
-        'message' => i18n_t('chat.greeting', $code),
+        'message' => $message,
         'suggestions' => $pathChipsFor($code),
     ];
 };
@@ -181,13 +192,19 @@ $cardy_soft_confirm_greeting = static function (array &$session, int $userId, ?a
     ];
 };
 
-$cardy_boot_greeting = static function (array &$session, int $userId, ?string $prefLocale, ?array $navigatorLanguages) use ($cardy_preferred_greeting, $cardy_soft_confirm_greeting, $isTestUser): array {
+$skipIntro = !$isTestUser && cardobot_user_should_skip_intro($userId);
+
+$cardy_boot_greeting = static function (array &$session, int $userId, ?string $prefLocale, ?array $navigatorLanguages) use ($cardy_preferred_greeting, $cardy_soft_confirm_greeting, $isTestUser, $skipIntro): array {
     if ($isTestUser) {
         // Always start the test pipeline in English; switch via menu / chips afterward.
         return $cardy_soft_confirm_greeting($session, $userId, null, 'en');
     }
     if ($prefLocale) {
-        return $cardy_preferred_greeting($session, $prefLocale);
+        return $cardy_preferred_greeting($session, $prefLocale, $skipIntro);
+    }
+    if ($skipIntro) {
+        // Returning user without a saved locale: still skip stranger intro.
+        return $cardy_preferred_greeting($session, i18n_predict_locale($userId, $navigatorLanguages), true);
     }
     return $cardy_soft_confirm_greeting($session, $userId, $navigatorLanguages, null);
 };
@@ -210,6 +227,7 @@ switch ($action) {
             // Do not append welcome-back into history until we save below;
             // flag so client can restore prior history separately.
             $session['resume_offered'] = true;
+            cardobot_user_mark_intro_seen($userId);
             break;
         }
         // No resumable session: preferred language or soft-confirm (one language only).
@@ -218,6 +236,14 @@ switch ($action) {
         $staticMessage = $greet['message'];
         $staticSuggestions = $greet['suggestions'];
         $pathSuggestions = $pathChipsFor($loc);
+        break;
+
+    case 'mark_intro_seen':
+        cardobot_user_mark_intro_seen($userId);
+        $skipModel = true;
+        $staticMessage = '';
+        $staticSuggestions = [];
+        $userMessage = '';
         break;
 
     case 'continue_resume':
@@ -841,6 +867,7 @@ if ($skipModel) {
     // Resume welcome-back and continue_resume should not pollute history.
     $skipHistoryAppend = ($action === 'resume' && $resumed)
         || $action === 'continue_resume'
+        || $action === 'mark_intro_seen'
         || ($staticMessage === null || $staticMessage === '');
     if (!$skipHistoryAppend && $staticMessage !== null) {
         $session['history'][] = ['role' => 'assistant', 'content' => $staticMessage];
@@ -868,6 +895,7 @@ if ($skipModel) {
         'awaiting_language_switch' => !empty($session['awaiting_language_switch']),
         'refresh_locale_pack' => $refreshLocalePack,
         'resumed' => $resumed,
+        'skip_intro' => $skipIntro || $resumed || $action === 'mark_intro_seen',
         'history' => $resumed ? ($session['history'] ?? []) : null,
         'message' => $staticMessage ?? '',
         'suggestions' => $staticSuggestions,

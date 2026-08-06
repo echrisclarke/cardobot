@@ -542,12 +542,95 @@ function cardobot_ensure_test_user(): void {
 }
 
 /**
+ * Ensure returning-user flags exist on cardobot_users.
+ */
+function cardobot_ensure_user_flags_schema(?PDO $pdo = null): void {
+    static $done = false;
+    if ($done) {
+        return;
+    }
+    if ($pdo === null) {
+        $pdo = function_exists('get_db_connection') ? get_db_connection() : null;
+    }
+    if (!$pdo) {
+        return;
+    }
+    try {
+        $pdo->exec("ALTER TABLE `cardobot_users` ADD COLUMN `intro_seen` TINYINT(1) NOT NULL DEFAULT 0");
+    } catch (Throwable $e) {
+        // column may already exist
+    }
+    $done = true;
+}
+
+/**
+ * Returning users skip the dock story + Continue gates.
+ */
+function cardobot_user_should_skip_intro(int $userId): bool {
+    if ($userId <= 0) {
+        return false;
+    }
+    if (!empty($_SESSION['cardobot_intro_seen'])) {
+        return true;
+    }
+    $pdo = function_exists('get_db_connection') ? get_db_connection() : null;
+    if (!$pdo) {
+        return !empty($_SESSION['cardobot_intro_seen']);
+    }
+    cardobot_ensure_user_flags_schema($pdo);
+    try {
+        $stmt = $pdo->prepare('SELECT intro_seen, preferred_locale FROM cardobot_users WHERE id = ? LIMIT 1');
+        $stmt->execute([$userId]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        if ($row) {
+            if (!empty($row['intro_seen'])) {
+                $_SESSION['cardobot_intro_seen'] = 1;
+                return true;
+            }
+            if (trim((string)($row['preferred_locale'] ?? '')) !== '') {
+                cardobot_user_mark_intro_seen($userId);
+                return true;
+            }
+        }
+        // Anyone who already printed a card has been through the console.
+        $cards = $pdo->prepare('SELECT id FROM cardobot_cards WHERE user_id = ? LIMIT 1');
+        $cards->execute([$userId]);
+        if ($cards->fetch(PDO::FETCH_ASSOC)) {
+            cardobot_user_mark_intro_seen($userId);
+            return true;
+        }
+    } catch (Throwable $e) {
+        // fall through
+    }
+    return false;
+}
+
+function cardobot_user_mark_intro_seen(int $userId): void {
+    $_SESSION['cardobot_intro_seen'] = 1;
+    if ($userId <= 0) {
+        return;
+    }
+    $pdo = function_exists('get_db_connection') ? get_db_connection() : null;
+    if (!$pdo) {
+        return;
+    }
+    cardobot_ensure_user_flags_schema($pdo);
+    try {
+        $stmt = $pdo->prepare('UPDATE cardobot_users SET intro_seen = 1 WHERE id = ?');
+        $stmt->execute([$userId]);
+    } catch (Throwable $e) {
+        error_log('cardobot_user_mark_intro_seen: ' . $e->getMessage());
+    }
+}
+
+/**
  * Wipe PHP (+ DB if available) Cardy chat state for the always-fresh test account.
  * Also resets language so a prior Chinese/Spanish preference cannot sticky-lock the pipeline.
  */
 function cardobot_wipe_test_user_chat(int $userId): void {
     $_SESSION['cardobot_sessions'] = [];
     unset($_SESSION['cardobot_locale']);
+    unset($_SESSION['cardobot_intro_seen']);
 
     require_once __DIR__ . '/i18n.php';
     require_once __DIR__ . '/state.php';
@@ -562,7 +645,8 @@ function cardobot_wipe_test_user_chat(int $userId): void {
         if ($pdo) {
             try {
                 i18n_ensure_schema($pdo);
-                $stmt = $pdo->prepare('UPDATE cardobot_users SET preferred_locale = NULL WHERE id = ?');
+                cardobot_ensure_user_flags_schema($pdo);
+                $stmt = $pdo->prepare('UPDATE cardobot_users SET preferred_locale = NULL, intro_seen = 0 WHERE id = ?');
                 $stmt->execute([$userId]);
             } catch (Throwable $e) {
                 error_log('cardobot_wipe_test_user_chat locale: ' . $e->getMessage());
