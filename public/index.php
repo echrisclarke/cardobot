@@ -324,12 +324,14 @@ body.chat-page .chat-messages.show-cardy-bg {
     const cardobotUsername = <?php echo json_encode($cardobotUsername); ?>;
     let studio = null;
     let lastArtUrl = null;
+    let lastArtCached = null; // stable data URL so reopen never depends on a flaky remote/path
     let lastDrawingData = null;
     let lastHsl = null;
     let lastBackExtras = null;
     let lastConcept = {};
     let lastStats = null;
     let cardViewer = null;
+    let openCardAppGate = Promise.resolve();
 
     function conceptWithCredit(concept) {
         const c = Object.assign({}, concept || {});
@@ -640,6 +642,8 @@ body.chat-page .chat-messages.show-cardy-bg {
         });
         if ((data.image_url || data.image_b64) && (state.step === 'reveal' || state.step === 'studio')) {
             const img = data.image_url || ('data:image/png;base64,' + data.image_b64);
+            lastArtUrl = img;
+            warmArtCache(img);
             const wrap = document.createElement('div');
             wrap.className = 'chat-message cardy';
             const imageEl = document.createElement('img');
@@ -1001,12 +1005,45 @@ body.chat-page .chat-messages.show-cardy-bg {
         state.imageLoadingElement = null;
     }
 
+    function blobToDataUrl(blob) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(String(reader.result || ''));
+            reader.onerror = reject;
+            reader.readAsDataURL(blob);
+        });
+    }
+
+    async function warmArtCache(url) {
+        if (!url) return;
+        if (String(url).startsWith('data:')) {
+            lastArtCached = url;
+            lastArtUrl = url;
+            return;
+        }
+        try {
+            const res = await fetch(url, { credentials: 'same-origin', cache: 'force-cache' });
+            if (!res.ok) throw new Error('art fetch ' + res.status);
+            const blob = await res.blob();
+            if (!blob || blob.size < 32) throw new Error('art empty');
+            const dataUrl = await blobToDataUrl(blob);
+            if (dataUrl && dataUrl.startsWith('data:')) {
+                lastArtCached = dataUrl;
+                lastArtUrl = url;
+            }
+        } catch (e) {
+            // Keep lastArtUrl pointing at the original; cache may fill on a later try.
+            console.warn('art cache warm failed', e);
+        }
+    }
+
     // Replace the loading placeholder with the finished image inline.
     // Defensive: if an image block already exists, remove it first so we
     // never accumulate duplicate copies in the chat.
     function showImage(url) {
         removeImageLoading();
         lastArtUrl = url;
+        warmArtCache(url);
         if (state.imageElement && state.imageElement.parentNode) {
             state.imageElement.parentNode.removeChild(state.imageElement);
             state.imageElement = null;
@@ -1030,6 +1067,10 @@ body.chat-page .chat-messages.show-cardy-bg {
             onClose: (payload) => {
                 if (payload && payload.drawing) lastDrawingData = payload.drawing;
                 if (payload && payload.hsl) lastHsl = payload.hsl;
+                if (payload && payload.artUrl) {
+                    lastArtUrl = payload.artUrl;
+                    if (String(payload.artUrl).startsWith('data:')) lastArtCached = payload.artUrl;
+                }
                 if (payload) {
                     lastBackExtras = {
                         back_variant: payload.backVariant,
@@ -1053,27 +1094,35 @@ body.chat-page .chat-messages.show-cardy-bg {
     }
 
     async function openCardApp(mode) {
-        if (!lastArtUrl) return;
+        const art = lastArtCached || lastArtUrl;
+        if (!art) return;
         $studioPanel.classList.remove('visible');
-        const v = ensureViewer();
-        const openPayload = {
-            sessionId: state.sessionId,
-            concept: conceptWithCredit(lastConcept || state.visualConcept || {}),
-            stats: lastStats || {},
-            artUrl: lastArtUrl,
-            mode: mode === 'draw' ? 'draw' : 'viewer',
-            drawingData: lastDrawingData || null,
-            hsl: lastHsl || null,
-        };
-        if (lastBackExtras) {
-            openPayload.backVariant = lastBackExtras.back_variant;
-            openPayload.backHsl = {
-                hue: lastBackExtras.back_hue,
-                saturation: lastBackExtras.back_saturation,
-                lightness: lastBackExtras.back_lightness,
+        const run = openCardAppGate.then(async () => {
+            if (!lastArtCached && lastArtUrl) {
+                await warmArtCache(lastArtUrl);
+            }
+            const v = ensureViewer();
+            const openPayload = {
+                sessionId: state.sessionId,
+                concept: conceptWithCredit(lastConcept || state.visualConcept || {}),
+                stats: lastStats || {},
+                artUrl: lastArtCached || lastArtUrl,
+                mode: mode === 'draw' ? 'draw' : 'viewer',
+                drawingData: lastDrawingData || null,
+                hsl: lastHsl || null,
             };
-        }
-        await v.open(openPayload);
+            if (lastBackExtras) {
+                openPayload.backVariant = lastBackExtras.back_variant;
+                openPayload.backHsl = {
+                    hue: lastBackExtras.back_hue,
+                    saturation: lastBackExtras.back_saturation,
+                    lightness: lastBackExtras.back_lightness,
+                };
+            }
+            await v.open(openPayload);
+        });
+        openCardAppGate = run.catch(() => {});
+        await run;
     }
 
     function appendRevealActionsAfter(messageEl) {
@@ -1902,6 +1951,7 @@ body.chat-page .chat-messages.show-cardy-bg {
         lastConcept = {};
         lastStats = null;
         lastArtUrl = null;
+        lastArtCached = null;
         const echo = t('reveal.make_another', 'Make another one');
         if (!options.skipUserEcho) {
             appendUserMessage(echo);

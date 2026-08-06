@@ -32,6 +32,14 @@ if ($kind === 'art') {
     header('Content-Length: ' . filesize($path));
     header('Content-Disposition: inline; filename="' . $cardId . '_art.png"');
     header('Cache-Control: private, max-age=3600');
+    // Allow studio canvas decode from our own origins.
+    $origin = isset($_SERVER['HTTP_ORIGIN']) ? (string)$_SERVER['HTTP_ORIGIN'] : '';
+    $originHost = $origin !== '' ? strtolower((string)(parse_url($origin, PHP_URL_HOST) ?: '')) : '';
+    if ($originHost !== '' && in_array($originHost, api_allowed_hosts(), true)) {
+        header('Access-Control-Allow-Origin: ' . $origin);
+        header('Access-Control-Allow-Credentials: true');
+        header('Vary: Origin');
+    }
     readfile($path);
     exit;
 }

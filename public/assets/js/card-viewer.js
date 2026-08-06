@@ -769,13 +769,23 @@
           hideTools: true,
         });
         await this.studio.setConcept(this.concept, this.stats);
-        if (this.artUrl) await this.studio.setArt(this.artUrl);
+        if (this.artUrl) {
+          try {
+            await this.studio.setArt(this.artUrl);
+          } catch (e) {
+            console.warn('Card art failed to load', e);
+          }
+        }
         if (payload.hsl && Number.isFinite(+payload.hsl.hue)) {
           this.studio.setHsl(+payload.hsl.hue, +payload.hsl.saturation, +payload.hsl.lightness, true);
           this.studio.lockUserTint(true);
         }
         if (payload.drawingData) {
-          await this.studio.loadDrawingData(payload.drawingData);
+          try {
+            await this.studio.loadDrawingData(payload.drawingData);
+          } catch (e) {
+            console.warn('Drawing layers failed to load', e);
+          }
         }
         this._wireEnginePan();
         this._syncColorSlidersFromStudio();
@@ -810,8 +820,10 @@
       document.body.classList.remove('cob-app-open');
       this._closeSheets();
       this._closePopovers();
+      const studioArt = this.studio && (this.studio.artUrl || (this.studio.artEl && this.studio.artEl.src));
       this.onClose({
         sessionId: this.sessionId,
+        artUrl: this.artUrl || studioArt || '',
         drawing: this.studio ? this.studio.getDrawingData() : null,
         hsl: this.studio ? this.studio.getHsl() : null,
         backVariant: this.backVariant,

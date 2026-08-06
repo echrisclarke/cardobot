@@ -607,8 +607,20 @@
     }
 
     async setArt(url) {
+      if (!url) return false;
+      this.artUrl = url;
+      this.artEl.removeAttribute('crossorigin');
       this.artEl.src = url;
-      this.artImage = await loadImage(url);
+      // Prefer CORS decode for composites; fall back so the well never goes blank.
+      try {
+        this.artImage = await loadImage(url);
+      } catch (e) {
+        try {
+          this.artImage = await loadImagePlain(url);
+        } catch (e2) {
+          this.artImage = await waitForImg(this.artEl);
+        }
+      }
       const art = L().ART_STUDIO;
       if (!this.engine) {
         this.engine = new global.CardobotDrawingEngine(this.drawHost, art.w, art.h, {
@@ -616,6 +628,7 @@
         });
         this.engine.setEnabled(false);
       }
+      return !!(this.artImage && (this.artImage.naturalWidth || this.artImage.width));
     }
 
     async loadDrawingData(data) {
@@ -760,6 +773,40 @@
       img.onload = () => resolve(img);
       img.onerror = reject;
       img.src = src;
+    });
+  }
+
+  function loadImagePlain(src) {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => resolve(img);
+      img.onerror = reject;
+      img.src = src;
+    });
+  }
+
+  function waitForImg(img) {
+    return new Promise((resolve, reject) => {
+      if (!img) {
+        reject(new Error('no image'));
+        return;
+      }
+      if (img.complete && img.naturalWidth) {
+        resolve(img);
+        return;
+      }
+      const ok = () => {
+        img.removeEventListener('load', ok);
+        img.removeEventListener('error', bad);
+        resolve(img);
+      };
+      const bad = () => {
+        img.removeEventListener('load', ok);
+        img.removeEventListener('error', bad);
+        reject(new Error('art load failed'));
+      };
+      img.addEventListener('load', ok);
+      img.addEventListener('error', bad);
     });
   }
 
